@@ -1,1 +1,1 @@
-# multimodal_representations_deep_learning
+# Using deep learning to obtain multimodal representations
