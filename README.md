@@ -1,6 +1,5 @@
-# HIVmorbidity
-Guidelines that I try to follow:
-
+# Master thesis: Using deep learning to obtain multimodal representations
+Guidelines that I will try to follow throughout the project:
 
 ## Steps to reproduce the virtual environment and run scripts from the project
 
@@ -8,8 +7,6 @@ Guidelines that I try to follow:
 2. Install poetry from: https://github.com/sdispater/poetry
 3. Navigate to the project directory where the ```pyproject.toml``` is.
 4. Run ```poetry install```. This will install all dependencies specified in the pyproject.toml file and it will create a virtual environment.
-
-## Version control
 
 ## Keeping the code clean and identically formatted
 
