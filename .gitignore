@@ -3,3 +3,5 @@
 /data
 /notebooks
 /logs
+/.idea
+/.pytest_cache

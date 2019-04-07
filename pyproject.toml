@@ -11,6 +11,8 @@ tensorflow = "^1.13"
 tqdm = "^4.31"
 hyperopt = "^0.1.2"
 "ruamel.yaml" = "^0.15.89"
+Pillow = "^6.0"
+opencv-python = "^4.0"
 
 [tool.poetry.dev-dependencies]
 black = {version = "^18.3-alpha.0",allows-prereleases = true}
