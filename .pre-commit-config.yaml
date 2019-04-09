@@ -11,3 +11,8 @@ repos:
     - id: flake8
       exclude: notebooks/
       args: [--max-line-length=88]
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    sha: master
+    hooks:
+    -   id: mypy
+        exclude: notebooks/

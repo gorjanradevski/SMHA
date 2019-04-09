@@ -3,3 +3,6 @@
 /data
 /notebooks
 /logs
+/.idea
+/.pytest_cache
+/.mypy_cache/
