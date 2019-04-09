@@ -4,19 +4,19 @@ import json
 import re
 import os
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, ValuesView
 
 from utils.constants import PAD_ID, UNK_ID
 
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger()
+logger = logging.getLogger()
 
 
 class Dataset:
 
-    word_freq = {}
-    word2index = {}
-    index2word = {}
+    word_freq: Dict[str, int] = {}
+    word2index: Dict[str, int] = {}
+    index2word: Dict[int, str] = {}
 
     def __init__(self, train: bool, images_path: str, json_path: str, min_unk_sub: int):
         """Creates a dataset object.
@@ -31,12 +31,15 @@ class Dataset:
         self.json_path = json_path
         self.json_file = self.read_json(json_path)
         self.min_unk_sub = min_unk_sub
+        logger.info("Object variables set")
         self.id_to_filename = self.parse_image_paths(self.json_file)
         self.id_to_captions = self.parse_captions(self.json_file)
+        logger.info("Dictionaries created")
         if train:
-            self.set_up_class_vars(*self.id_to_captions.values())
+            self.set_up_class_vars(self.id_to_captions.values())
+            logger.info("Class variables set")
 
-    def parse_image_paths(self, json_file: Dict[str, Any]) -> Dict[str, str]:
+    def parse_image_paths(self, json_file: Dict[str, Any]) -> Dict[int, str]:
         """Parses the images metadata from the json file.
 
         Args:
@@ -54,7 +57,7 @@ class Dataset:
 
         return id_to_filename
 
-    def parse_captions(self, json_file: Dict[str, Any]) -> Dict[str, List[str]]:
+    def parse_captions(self, json_file: Dict[str, Any]) -> Dict[int, List[str]]:
         """Parses the captions metadata from the json file.
 
         Args:
@@ -64,7 +67,7 @@ class Dataset:
             A dict that contains the image id and a list with the image captions.
 
         """
-        id_to_captions = {}
+        id_to_captions: Dict[int, List[str]] = {}
         for captions_data in json_file["annotations"]:
             if captions_data["image_id"] not in id_to_captions.keys():
                 id_to_captions[captions_data["image_id"]] = []
@@ -109,7 +112,7 @@ class Dataset:
         return json_file
 
     @classmethod
-    def set_up_class_vars(cls, captions: List[List[str]]) -> None:
+    def set_up_class_vars(cls, captions: ValuesView[List[str]]) -> None:
         """Sets up the class variables word_freq, word2index and index2word.
 
         1. Computes the word frequencies and sets the class variable with the value.
@@ -127,7 +130,7 @@ class Dataset:
         """
         index = 2
         word2index = {"<pad>": PAD_ID, "<unk>": UNK_ID}
-        word_freq = {}
+        word_freq: Dict[str, int] = {}
         for captions_list in captions:
             for caption in captions_list:
                 words = caption.split(" ")
@@ -153,7 +156,7 @@ class Dataset:
         for pair_id in self.id_to_filename.keys():
             image_paths.append(self.id_to_filename[pair_id])
             indexed_caption = [
-                Dataset.index2word[word]
+                Dataset.word2index[word]
                 if Dataset.word_freq[word] > self.min_unk_sub
                 else 0
                 for word in self.id_to_captions[pair_id][0].split()
