@@ -16,3 +16,4 @@ repos:
     hooks:
     -   id: mypy
         exclude: notebooks/
+        args: [--ignore-missing-imports]
