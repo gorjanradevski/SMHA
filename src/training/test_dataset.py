@@ -54,6 +54,21 @@ def id_to_captions_true():
     }
 
 
+@pytest.fixture
+def min_unk_sub():
+    return 2
+
+
+@pytest.fixture
+def train():
+    return True
+
+
+@pytest.fixture
+def images_paths_true():
+    return ["images/file1", "images/file2", "images/file3"]
+
+
 def test_read_json(json_path):
     json_file = Dataset.read_json(json_path)
     assert "images" in json_file
@@ -82,3 +97,22 @@ def test_set_up_class_vars(id_to_captions_true):
     assert len(Dataset.word2index) == 8
     assert len(Dataset.index2word) == 8
     assert sum(Dataset.index2word.keys()) == sum(range(8))
+
+
+def test_dataset_object_creation(images_path, json_path, min_unk_sub, train):
+    dataset = Dataset(images_path, json_path, min_unk_sub, train)
+    assert len(dataset.id_to_filename.keys()) == 3
+    assert len(dataset.id_to_captions.keys()) == 3
+
+
+def test_get_image_paths_and_corresponding_captions(
+    id_to_filename_true, id_to_captions_true, min_unk_sub
+):
+    Dataset.set_up_class_vars(id_to_captions_true.values())
+    image_paths, captions = Dataset.get_image_paths_and_corresponding_captions_wrapper(
+        id_to_filename_true, id_to_captions_true, min_unk_sub
+    )
+    assert len(image_paths) == 3
+    assert len(captions) == 3
+    for caption in captions:
+        assert len(caption) == 2

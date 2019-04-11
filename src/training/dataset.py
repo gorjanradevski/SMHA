@@ -18,14 +18,14 @@ class Dataset:
     word2index: Dict[str, int] = {}
     index2word: Dict[int, str] = {}
 
-    def __init__(self, train: bool, images_path: str, json_path: str, min_unk_sub: int):
+    def __init__(self, images_path: str, json_path: str, min_unk_sub: int, train: bool):
         """Creates a dataset object.
 
         Args:
-            train: Whether the dataset is training dataset.
             images_path: Path where the images are located.
             json_path: Path to the json file where the mappings are indicated as well
             as the captions.
+            train: Whether the dataset is training dataset.
         """
         json_file = self.read_json(json_path)
         self.min_unk_sub = min_unk_sub
@@ -146,21 +146,43 @@ class Dataset:
 
         cls.index2word = dict(zip(cls.word2index.values(), cls.word2index.keys()))
 
+    @staticmethod
+    def get_image_paths_and_corresponding_captions_wrapper(
+        id_to_filename, id_to_captions, min_unk_sub
+    ):
+        """Returns the image paths and captions.
+
+        Prototype version (Get only the first caption)
+        # TODO: Extend to return all captions
+
+        Args:
+            id_to_filename: Pair id to image filename dict.
+            id_to_captions: Pair id to captions dict.
+            min_unk_sub: Minimum numbed of times a word has to appear in order to be
+            left in the dataset.
+
+        Returns:
+            The image paths and captions ordered.
+
+        """
+        assert len(id_to_filename.keys()) == len(id_to_captions.keys())
+        image_paths = []
+        captions = []
+        for pair_id in id_to_filename.keys():
+            image_paths.append(id_to_filename[pair_id])
+            indexed_caption = [
+                Dataset.word2index[word] if Dataset.word_freq[word] > min_unk_sub else 0
+                for word in id_to_captions[pair_id][0]
+            ]
+            captions.append(indexed_caption)
+
+        return image_paths, captions
+
     def get_image_paths_and_corresponding_captions(
         self
     ) -> Tuple[List[str], List[List[int]]]:
-        # Prototype version (Get only the first caption)
-        assert len(self.id_to_filename.keys()) == len(self.id_to_captions.keys())
-        image_paths = []
-        captions = []
-        for pair_id in self.id_to_filename.keys():
-            image_paths.append(self.id_to_filename[pair_id])
-            indexed_caption = [
-                Dataset.word2index[word]
-                if Dataset.word_freq[word] > self.min_unk_sub
-                else 0
-                for word in self.id_to_captions[pair_id][0]
-            ]
-            captions.append(indexed_caption)
+        image_paths, captions = self.get_image_paths_and_corresponding_captions_wrapper(
+            self.id_to_filename, self.id_to_captions, self.min_unk_sub
+        )
 
         return image_paths, captions
