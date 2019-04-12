@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 from training.datasets import CocoDataset
 
 
@@ -151,4 +152,4 @@ def test_get_image_paths_and_corresponding_captions(
     for caption in captions:
         assert len(caption) == 2
     for length in lengths:
-        assert length == 2
+        assert np.squeeze(length) == 2

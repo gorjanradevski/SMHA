@@ -1,4 +1,3 @@
-
 import json
 import re
 import os
@@ -182,7 +181,9 @@ class CocoDataset:
                     for word in id_to_captions[pair_id][i]
                 ]
                 captions.append(indexed_caption)
-                lengths.append(len(indexed_caption))
+                # Must wrap with a list so that the rank will be the same as the
+                # captions
+                lengths.append([len(indexed_caption)])
 
         assert len(image_paths) == len(captions)
 
@@ -190,7 +191,7 @@ class CocoDataset:
 
     def get_img_paths_captions_lengths(
         self
-    ) -> Tuple[List[str], List[List[int]], List[int]]:
+    ) -> Tuple[List[str], List[List[int]], List[List[int]]]:
         image_paths, captions, lengths = self.get_img_paths_captions_lengths_wrapper(
             self.id_to_filename, self.id_to_captions, self.min_unk_sub
         )

@@ -2,7 +2,7 @@ import tensorflow as tf
 from typing import List, Tuple, Generator
 import logging
 
-from utils.constants import WIDTH, HEIGHT, BATCH_SIZE, NUM_CHANNELS
+from utils.constants import WIDTH, HEIGHT, NUM_CHANNELS
 
 
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +18,7 @@ class CocoTrainValLoader:
         val_image_paths: List[str],
         val_captions: List[List[int]],
         val_captions_lengths: List[int],
+        batch_size: int,
     ):
         # Build training dataset
         self.train_image_paths = train_image_paths
@@ -33,7 +34,7 @@ class CocoTrainValLoader:
         )
         self.train_dataset = self.train_dataset.map(self.parse_data)
         self.train_dataset = self.train_dataset.padded_batch(
-            BATCH_SIZE, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
+            batch_size, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
         self.train_dataset = self.train_dataset.prefetch(1)
         logger.info("Training dataset created...")
@@ -47,9 +48,9 @@ class CocoTrainValLoader:
             output_types=(tf.string, tf.int32, tf.int32),
             output_shapes=(None, None, None),
         )
-        self.val_dataset = self.val_dataset(self.parse_data)
+        self.val_dataset = self.val_dataset.map(self.parse_data)
         self.val_dataset = self.val_dataset.padded_batch(
-            BATCH_SIZE, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
+            batch_size, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
         logger.info("Validation dataset created...")
 
@@ -57,7 +58,7 @@ class CocoTrainValLoader:
             self.train_dataset.output_types, self.train_dataset.output_shapes
         )
 
-        # Initialize with required Datasets
+        # Initialize with required datasets
         self.train_init = self.iterator.make_initializer(self.train_dataset)
         self.val_init = self.iterator.make_initializer(self.val_dataset)
 
