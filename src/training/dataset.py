@@ -147,7 +147,7 @@ class Dataset:
         cls.index2word = dict(zip(cls.word2index.values(), cls.word2index.keys()))
 
     @staticmethod
-    def get_image_paths_and_corresponding_captions_wrapper(
+    def get_img_paths_captions_lengths_wrapper(
         id_to_filename, id_to_captions, min_unk_sub
     ):
         """Returns the image paths and captions.
@@ -166,12 +166,13 @@ class Dataset:
             left in the dataset.
 
         Returns:
-            The image paths and captions ordered.
+            The image paths, the captions and the lengths of the captions.
 
         """
         assert len(id_to_filename.keys()) == len(id_to_captions.keys())
         image_paths = []
         captions = []
+        lengths = []
         for pair_id in id_to_filename.keys():
             for i in range(5):
                 image_paths.append(id_to_filename[pair_id])
@@ -182,16 +183,17 @@ class Dataset:
                     for word in id_to_captions[pair_id][i]
                 ]
                 captions.append(indexed_caption)
+                lengths.append(len(indexed_caption))
 
         assert len(image_paths) == len(captions)
 
-        return image_paths, captions
+        return image_paths, captions, lengths
 
-    def get_image_paths_and_corresponding_captions(
+    def get_img_paths_captions_lengths(
         self
-    ) -> Tuple[List[str], List[List[int]]]:
-        image_paths, captions = self.get_image_paths_and_corresponding_captions_wrapper(
+    ) -> Tuple[List[str], List[List[int]], List[int]]:
+        image_paths, captions, lengths = self.get_img_paths_captions_lengths_wrapper(
             self.id_to_filename, self.id_to_captions, self.min_unk_sub
         )
 
-        return image_paths, captions
+        return image_paths, captions, lengths
