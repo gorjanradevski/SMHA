@@ -1,0 +1,154 @@
+{
+    "info":
+    {
+        "description": "COCO 2014 Dataset",
+        "url": "http://cocodataset.org",
+        "version": "1.0",
+        "year": 2014,
+        "contributor": "COCO Consortium",
+        "date_created": "2017/09/01"
+    },
+    "images": [
+    {
+        "license": 3,
+        "file_name": "COCO_val2014_000000391895.jpg",
+        "coco_url": "http://images.cocodataset.org/val2014/COCO_val2014_000000391895.jpg",
+        "height": 360,
+        "width": 640,
+        "date_captured": "2013-11-14 11:18:45",
+        "flickr_url": "http://farm9.staticflickr.com/8186/8119368305_4e622c8349_z.jpg",
+        "id": 1
+    },
+    {
+        "license": 4,
+        "file_name": "COCO_val2014_000000522418.jpg",
+        "coco_url": "http://images.cocodataset.org/val2014/COCO_val2014_000000522418.jpg",
+        "height": 480,
+        "width": 640,
+        "date_captured": "2013-11-14 11:38:44",
+        "flickr_url": "http://farm1.staticflickr.com/1/127244861_ab0c0381e7_z.jpg",
+        "id": 2
+    },
+    {
+        "license": 3,
+        "file_name": "COCO_val2014_000000184613.jpg",
+        "coco_url": "http://images.cocodataset.org/val2014/COCO_val2014_000000184613.jpg",
+        "height": 336,
+        "width": 500,
+        "date_captured": "2013-11-14 12:36:29",
+        "flickr_url": "http://farm3.staticflickr.com/2169/2118578392_1193aa04a0_z.jpg",
+        "id": 3
+    }],
+    "licenses": [
+    {
+        "url": "http://creativecommons.org/licenses/by-nc-sa/2.0/",
+        "id": 1,
+        "name": "Attribution-NonCommercial-ShareAlike License"
+    },
+    {
+        "url": "http://creativecommons.org/licenses/by-nc/2.0/",
+        "id": 2,
+        "name": "Attribution-NonCommercial License"
+    },
+    {
+        "url": "http://creativecommons.org/licenses/by-nc-nd/2.0/",
+        "id": 3,
+        "name": "Attribution-NonCommercial-NoDerivs License"
+    },
+    {
+        "url": "http://creativecommons.org/licenses/by/2.0/",
+        "id": 4,
+        "name": "Attribution License"
+    },
+    {
+        "url": "http://creativecommons.org/licenses/by-sa/2.0/",
+        "id": 5,
+        "name": "Attribution-ShareAlike License"
+    },
+    {
+        "url": "http://creativecommons.org/licenses/by-nd/2.0/",
+        "id": 6,
+        "name": "Attribution-NoDerivs License"
+    },
+    {
+        "url": "http://flickr.com/commons/usage/",
+        "id": 7,
+        "name": "No known copyright restrictions"
+    },
+    {
+        "url": "http://www.usa.gov/copyright.shtml",
+        "id": 8,
+        "name": "United States Government Work"
+    }],
+    "annotations": [
+    {
+        "image_id": 1,
+        "id": 37,
+        "caption": "A bicycle replica with a clock as the front wheel."
+    },
+    {
+        "image_id": 1,
+        "id": 38,
+        "caption": "A bicycle replica with a clock as the front wheel."
+    },
+    {
+        "image_id": 1,
+        "id": 39,
+        "caption": "A bicycle replica with a clock as the front wheel."
+    },
+    {
+        "image_id": 1,
+        "id": 40,
+        "caption": "A bicycle replica with a clock as the front wheel."
+    },
+    {
+        "image_id": 1,
+        "id": 41,
+        "caption": "A black Honda motorcycle parked in front of a garage."
+    },
+    {
+        "image_id": 2,
+        "id": 42,
+        "caption": "A room with blue walls and a white sink and door."
+    },
+    {
+        "image_id": 2,
+        "id": 43,
+        "caption": "A room with blue walls and a white sink and door."
+    },
+    {
+        "image_id": 2,
+        "id": 44,
+        "caption": "A room with blue walls and a white sink and door."
+    },
+    {
+        "image_id": 2,
+        "id": 45,
+        "caption": "A room with blue walls and a white sink and door."
+    },
+    {
+        "image_id": 2,
+        "id": 46,
+        "caption": "A car that seems to be parked illegally behind a legally parked car"
+    },
+    {
+        "image_id": 3,
+        "id": 98,
+        "caption": "A large passenger airplane flying through the air."
+    },
+    {
+        "image_id": 3,
+        "id": 98,
+        "caption": "A large passenger airplane flying through the air."
+    },
+    {
+        "image_id": 3,
+        "id": 98,
+        "caption": "A large passenger airplane flying through the air."
+    },
+    {
+        "image_id": 3,
+        "id": 98,
+        "caption": "A large passenger airplane flying through the air."
+    }]
+}

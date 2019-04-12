@@ -1,6 +1,8 @@
 /.DS_Store
 /models
-/data
+/data/annotations/
+/data/train2014/
+/data/val2014/
 /notebooks
 /logs
 /.idea
