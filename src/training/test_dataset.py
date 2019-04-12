@@ -69,6 +69,33 @@ def images_paths_true():
     return ["images/file1", "images/file2", "images/file3"]
 
 
+@pytest.fixture
+def id_to_captions_get_image_paths_and_corresponding_captions():
+    return {
+        1: [
+            ["first", "caption"],
+            ["fourth", "caption"],
+            ["fourth", "caption"],
+            ["fourth", "caption"],
+            ["fourth", "caption"],
+        ],
+        2: [
+            ["second", "caption"],
+            ["fifth", "caption"],
+            ["fifth", "caption"],
+            ["fifth", "caption"],
+            ["fifth", "caption"],
+        ],
+        3: [
+            ["third", "caption"],
+            ["third", "caption"],
+            ["third", "caption"],
+            ["third", "caption"],
+            ["third", "caption"],
+        ],
+    }
+
+
 def test_read_json(json_path):
     json_file = Dataset.read_json(json_path)
     assert "images" in json_file
@@ -106,13 +133,19 @@ def test_dataset_object_creation(images_path, json_path, min_unk_sub, train):
 
 
 def test_get_image_paths_and_corresponding_captions(
-    id_to_filename_true, id_to_captions_true, min_unk_sub
+    id_to_filename_true,
+    id_to_captions_get_image_paths_and_corresponding_captions,
+    min_unk_sub,
 ):
-    Dataset.set_up_class_vars(id_to_captions_true.values())
-    image_paths, captions = Dataset.get_image_paths_and_corresponding_captions_wrapper(
-        id_to_filename_true, id_to_captions_true, min_unk_sub
+    Dataset.set_up_class_vars(
+        id_to_captions_get_image_paths_and_corresponding_captions.values()
     )
-    assert len(image_paths) == 3
-    assert len(captions) == 3
+    image_paths, captions = Dataset.get_image_paths_and_corresponding_captions_wrapper(
+        id_to_filename_true,
+        id_to_captions_get_image_paths_and_corresponding_captions,
+        min_unk_sub,
+    )
+    assert len(image_paths) == 15
+    assert len(captions) == 15
     for caption in captions:
         assert len(caption) == 2

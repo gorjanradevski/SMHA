@@ -152,8 +152,12 @@ class Dataset:
     ):
         """Returns the image paths and captions.
 
-        Prototype version (Get only the first caption)
-        # TODO: Extend to return all captions
+        Because in the dataset there are 5 captions for each image, what the method does
+        is create:
+
+        - A list of image paths where each image path is repeated 5 times.
+        - A list of lists of word tokens where the number of inner lists is equal to the
+        number of image paths.
 
         Args:
             id_to_filename: Pair id to image filename dict.
@@ -169,12 +173,17 @@ class Dataset:
         image_paths = []
         captions = []
         for pair_id in id_to_filename.keys():
-            image_paths.append(id_to_filename[pair_id])
-            indexed_caption = [
-                Dataset.word2index[word] if Dataset.word_freq[word] > min_unk_sub else 0
-                for word in id_to_captions[pair_id][0]
-            ]
-            captions.append(indexed_caption)
+            for i in range(5):
+                image_paths.append(id_to_filename[pair_id])
+                indexed_caption = [
+                    Dataset.word2index[word]
+                    if Dataset.word_freq[word] > min_unk_sub
+                    else 0
+                    for word in id_to_captions[pair_id][i]
+                ]
+                captions.append(indexed_caption)
+
+        assert len(image_paths) == len(captions)
 
         return image_paths, captions
 
