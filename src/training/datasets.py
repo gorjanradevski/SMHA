@@ -1,4 +1,3 @@
-# Adapted for working with the Microsoft COCO dataset.
 
 import json
 import re
@@ -12,8 +11,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 
-class Dataset:
-
+class CocoDataset:
+    # Adapted for working with the Microsoft COCO dataset.
     word_freq: Dict[str, int] = {}
     word2index: Dict[str, int] = {}
     index2word: Dict[int, str] = {}
@@ -29,13 +28,13 @@ class Dataset:
         """
         json_file = self.read_json(json_path)
         self.min_unk_sub = min_unk_sub
-        logger.info("Object variables set")
+        logger.info("Object variables set...")
         self.id_to_filename = self.parse_image_paths(json_file, images_path)
         self.id_to_captions = self.parse_captions(json_file)
-        logger.info("Dictionaries created")
+        logger.info("Dictionaries created...")
         if train:
             self.set_up_class_vars(self.id_to_captions.values())
-            logger.info("Class variables set")
+            logger.info("Class variables set...")
 
     @staticmethod
     def parse_image_paths(
@@ -177,8 +176,8 @@ class Dataset:
             for i in range(5):
                 image_paths.append(id_to_filename[pair_id])
                 indexed_caption = [
-                    Dataset.word2index[word]
-                    if Dataset.word_freq[word] > min_unk_sub
+                    CocoDataset.word2index[word]
+                    if CocoDataset.word_freq[word] > min_unk_sub
                     else 0
                     for word in id_to_captions[pair_id][i]
                 ]

@@ -1,10 +1,15 @@
 import tensorflow as tf
 from typing import List, Tuple, Generator
+import logging
 
 from utils.constants import WIDTH, HEIGHT, BATCH_SIZE, NUM_CHANNELS
 
 
-class TrainValLoader:
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
+
+
+class CocoTrainValLoader:
     def __init__(
         self,
         train_image_paths: List[str],
@@ -31,6 +36,7 @@ class TrainValLoader:
             BATCH_SIZE, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
         self.train_dataset = self.train_dataset.prefetch(1)
+        logger.info("Training dataset created...")
 
         # Build validation dataset
         self.val_image_paths = val_image_paths
@@ -45,6 +51,7 @@ class TrainValLoader:
         self.val_dataset = self.val_dataset.padded_batch(
             BATCH_SIZE, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
+        logger.info("Validation dataset created...")
 
         self.iterator = tf.data.Iterator.from_structure(
             self.train_dataset.output_types, self.train_dataset.output_shapes
@@ -53,6 +60,8 @@ class TrainValLoader:
         # Initialize with required Datasets
         self.train_init = self.iterator.make_initializer(self.train_dataset)
         self.val_init = self.iterator.make_initializer(self.val_dataset)
+
+        logger.info("Iterator created...")
 
     @staticmethod
     def parse_data(
