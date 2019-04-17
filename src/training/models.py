@@ -8,8 +8,39 @@ from training.cells import cell_factory
 
 
 class Text2ImageMatchingModel:
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        seed: int,
+        images: tf.Tensor,
+        captions: tf.Tensor,
+        captions_len: tf.Tensor,
+        rnn_hidden_size: int,
+        vocab_size: int,
+        embedding_size: int,
+        cell_type: str,
+        num_layers: int,
+        keep_prob: float,
+        attn_size1: int,
+        attn_size2: int,
+    ):
+        image_encoded = self.image_encoder_graph(images, rnn_hidden_size)
+        text_encoded = self.text_encoder_graph(
+            seed,
+            captions,
+            captions_len,
+            vocab_size,
+            embedding_size,
+            cell_type,
+            rnn_hidden_size,
+            num_layers,
+            keep_prob,
+        )
+        self.attended_image = self.join_attention_graph(
+            seed, attn_size1, attn_size2, image_encoded, reuse=False
+        )
+        self.attended_text = self.join_attention_graph(
+            seed, attn_size1, attn_size2, text_encoded, reuse=True
+        )
 
     @staticmethod
     def image_encoder_graph(images: tf.Tensor, rnn_hidden_size: int) -> tf.Tensor:
@@ -58,13 +89,16 @@ class Text2ImageMatchingModel:
                 project_layer = tf.layers.dense(
                     image_feature_extractor, 2 * rnn_hidden_size
                 )
-                return tf.reshape(
-                    project_layer,
-                    [
-                        -1,
-                        project_layer.shape[1] * project_layer.shape[2],
-                        2 * rnn_hidden_size,
-                    ],
+                return tf.cast(
+                    tf.reshape(
+                        project_layer,
+                        [
+                            -1,
+                            project_layer.shape[1] * project_layer.shape[2],
+                            2 * rnn_hidden_size,
+                        ],
+                    ),
+                    tf.float32,
                 )
 
     @staticmethod
@@ -75,7 +109,7 @@ class Text2ImageMatchingModel:
         vocab_size: int,
         embedding_size: int,
         cell_type: str,
-        num_units: int,
+        rnn_hidden_size: int,
         num_layers: int,
         keep_prob: float,
     ):
@@ -88,7 +122,7 @@ class Text2ImageMatchingModel:
             vocab_size: The size of the vocabulary.
             embedding_size: The size of the embedding layer.
             cell_type: The cell type.
-            num_units: The size of the weight matrix in the cell.
+            rnn_hidden_size: The size of the weight matrix in the cell.
             num_layers: The number of layers of the rnn.
             keep_prob: The dropout probability (1.0 means keep everything)
 
@@ -102,8 +136,8 @@ class Text2ImageMatchingModel:
             trainable=True,
         )
         inputs = tf.nn.embedding_lookup(embeddings, captions)
-        cell_fw = cell_factory(seed, cell_type, num_units, num_layers, keep_prob)
-        cell_bw = cell_factory(seed, cell_type, num_units, num_layers, keep_prob)
+        cell_fw = cell_factory(seed, cell_type, rnn_hidden_size, num_layers, keep_prob)
+        cell_bw = cell_factory(seed, cell_type, rnn_hidden_size, num_layers, keep_prob)
         (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
             cell_fw, cell_bw, inputs, sequence_length=captions_len, dtype=tf.float32
         )
@@ -142,6 +176,7 @@ class Text2ImageMatchingModel:
             kernel_initializer=tf.glorot_uniform_initializer(seed=seed),
             bias_initializer=tf.zeros_initializer(),
             reuse=reuse,
+            name="Wa1",
         )
         alphas = tf.layers.dense(
             project,
@@ -150,5 +185,16 @@ class Text2ImageMatchingModel:
             kernel_initializer=tf.glorot_uniform_initializer(seed=seed),
             bias_initializer=tf.zeros_initializer(),
             reuse=reuse,
+            name="Wa2",
         )
         return tf.matmul(tf.transpose(encoded_input, [0, 2, 1]), alphas)
+
+    @staticmethod
+    def create_loss(
+        attended_image: tf.Tensor, attended_text: tf.Tensor, weight_decay: float
+    ):
+        pass
+
+    @staticmethod
+    def create_optimizer():
+        pass

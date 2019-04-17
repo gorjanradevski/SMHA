@@ -13,7 +13,7 @@ def rnn_hidden_size():
 
 @pytest.fixture
 def input_images():
-    return np.random.rand(2, 224, 224, 3)
+    return np.random.rand(3, 224, 224, 3)
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ def encoded_input():
 
 def test_image_encoder(input_images, rnn_hidden_size):
     tf.reset_default_graph()
-    input_layer = tf.placeholder(dtype=tf.float32, shape=[2, 224, 224, 3])
+    input_layer = tf.placeholder(dtype=tf.float32, shape=[3, 224, 224, 3])
     image_encoded = Text2ImageMatchingModel.image_encoder_graph(
         input_layer, rnn_hidden_size
     )
@@ -82,7 +82,7 @@ def test_image_encoder(input_images, rnn_hidden_size):
         output_shape = sess.run(
             image_encoded, feed_dict={input_layer: input_images}
         ).shape
-    assert output_shape[0] == 2
+    assert output_shape[0] == 3
     assert output_shape[2] == 2 * rnn_hidden_size
 
 
@@ -131,6 +131,40 @@ def test_joint_attention(seed, rnn_hidden_size, attn_size1, attn_size2, encoded_
         assert attended_shape[0] == 5
         assert attended_shape[1] == rnn_hidden_size * 2
         assert attended_shape[2] == attn_size2
+
+
+def test_attended_image_text_shape(
+    seed,
+    input_images,
+    captions,
+    captions_len,
+    rnn_hidden_size,
+    vocab_size,
+    embedding_size,
+    cell_type,
+    num_layers,
+    keep_prob,
+    attn_size1,
+    attn_size2,
+):
+    tf.reset_default_graph()
+    model = Text2ImageMatchingModel(
+        seed,
+        input_images,
+        captions,
+        captions_len,
+        rnn_hidden_size,
+        vocab_size,
+        embedding_size,
+        cell_type,
+        num_layers,
+        keep_prob,
+        attn_size1,
+        attn_size2,
+    )
+    assert model.attended_image.shape[0] == model.attended_text.shape[0]
+    assert model.attended_image.shape[1] == model.attended_text.shape[1]
+    assert model.attended_image.shape[2] == model.attended_text.shape[2]
 
 
 # TODO: Test trainable image encoder
