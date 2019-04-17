@@ -197,3 +197,13 @@ class CocoDataset:
         )
 
         return image_paths, captions, lengths
+
+    @classmethod
+    def get_vocab_size(cls) -> int:
+        """Returns the size of the vocabulary.
+
+        Returns:
+            The size of the vocabulary.
+
+        """
+        return len(cls.word2index)
