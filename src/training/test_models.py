@@ -186,4 +186,11 @@ def test_attended_image_text_shape(
     assert model.attended_image.shape[2] == model.attended_text.shape[2]
 
 
-# TODO: Test trainable image encoder
+def test_trainable_image_encoder(input_images, rnn_hidden_size):
+    # Tests if the variables of the image encoder aren't trainable
+    tf.reset_default_graph()
+    input_layer = tf.placeholder(dtype=tf.float32, shape=[3, 224, 224, 3])
+    _ = Text2ImageMatchingModel.image_encoder_graph(input_layer, rnn_hidden_size)
+    trainable_vars = tf.trainable_variables()
+    for variable in trainable_vars:
+        assert "project_image" in variable.name
