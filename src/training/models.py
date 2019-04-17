@@ -5,6 +5,7 @@ from tensorflow.contrib.layers.python.layers import layers as layers_lib
 from tensorflow.python.ops import variable_scope
 
 from training.cells import cell_factory
+from training.optimizers import optimizer_factory
 
 
 class Text2ImageMatchingModel:
@@ -19,12 +20,16 @@ class Text2ImageMatchingModel:
         embedding_size: int,
         cell_type: str,
         num_layers: int,
-        keep_prob: float,
         attn_size1: int,
         attn_size2: int,
+        optimizer_type: str,
+        learning_rate: float,
+        clip_value: int,
     ):
-        image_encoded = self.image_encoder_graph(images, rnn_hidden_size)
-        text_encoded = self.text_encoder_graph(
+        self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
+        self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
+        self.image_encoded = self.image_encoder_graph(images, rnn_hidden_size)
+        self.text_encoded = self.text_encoder_graph(
             seed,
             captions,
             captions_len,
@@ -33,13 +38,19 @@ class Text2ImageMatchingModel:
             cell_type,
             rnn_hidden_size,
             num_layers,
-            keep_prob,
+            self.keep_prob,
         )
         self.attended_image = self.join_attention_graph(
-            seed, attn_size1, attn_size2, image_encoded, reuse=False
+            seed, attn_size1, attn_size2, self.image_encoded, reuse=False
         )
         self.attended_text = self.join_attention_graph(
-            seed, attn_size1, attn_size2, text_encoded, reuse=True
+            seed, attn_size1, attn_size2, self.text_encoded, reuse=True
+        )
+        self.loss = self.compute_loss(
+            self.attended_image, self.attended_text, self.weight_decay
+        )
+        self.optimize = self.apply_gradients_op(
+            self.loss, optimizer_type, learning_rate, clip_value
         )
 
     @staticmethod
@@ -190,11 +201,29 @@ class Text2ImageMatchingModel:
         return tf.matmul(tf.transpose(encoded_input, [0, 2, 1]), alphas)
 
     @staticmethod
-    def create_loss(
+    def compute_loss(
         attended_image: tf.Tensor, attended_text: tf.Tensor, weight_decay: float
-    ):
+    ) -> float:
         pass
 
     @staticmethod
-    def create_optimizer():
-        pass
+    def apply_gradients_op(
+        loss: float, optimizer_type: str, learning_rate: float, clip_value: int
+    ) -> tf.Operation:
+        """Applies the gradients on the variables.
+
+        Args:
+            loss: The computed loss.
+            optimizer_type: The type of the optmizer.
+            learning_rate: The optimizer learning rate.
+            clip_value: The clipping value.
+
+        Returns:
+            An operation node to be executed in order to apply the computed gradients.
+
+        """
+        optimizer = optimizer_factory(optimizer_type, learning_rate)
+        gradients, variables = zip(*optimizer.compute_gradients(loss))
+        gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
+
+        return optimizer.apply_gradients(zip(gradients, variables))

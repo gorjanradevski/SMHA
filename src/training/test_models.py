@@ -71,6 +71,21 @@ def encoded_input():
     return np.random.rand(5, 10, 100)
 
 
+@pytest.fixture
+def optimizer_type():
+    return "adam"
+
+
+@pytest.fixture
+def learning_rate():
+    return 0.0
+
+
+@pytest.fixture
+def clip_value():
+    return 0.0
+
+
 def test_image_encoder(input_images, rnn_hidden_size):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[3, 224, 224, 3])
@@ -143,9 +158,11 @@ def test_attended_image_text_shape(
     embedding_size,
     cell_type,
     num_layers,
-    keep_prob,
     attn_size1,
     attn_size2,
+    optimizer_type,
+    learning_rate,
+    clip_value,
 ):
     tf.reset_default_graph()
     model = Text2ImageMatchingModel(
@@ -158,9 +175,11 @@ def test_attended_image_text_shape(
         embedding_size,
         cell_type,
         num_layers,
-        keep_prob,
         attn_size1,
         attn_size2,
+        optimizer_type,
+        learning_rate,
+        clip_value,
     )
     assert model.attended_image.shape[0] == model.attended_text.shape[0]
     assert model.attended_image.shape[1] == model.attended_text.shape[1]
