@@ -117,18 +117,22 @@ class Text2ImageMatchingModel:
         encoded_input: tf.Tensor,
         reuse=False,
     ):
-        """
+        """Applies the same attention on the encoded image and the encoded text.
 
         As per: https://arxiv.org/pdf/1703.03130.pdf
 
+        The "A structured self-attentative sentence embedding" paper goes through
+        the attention mechanism applied here.
+
         Args:
-            seed:
-            attn_size1:
-            attn_size2:
-            encoded_input:
-            reuse:
+            seed: The random seed to initialize the weights.
+            attn_size1: The size of the first projection.
+            attn_size2: The size of the second projection.
+            encoded_input: The encoded input, can be both the image and the text.
+            reuse: Whether to reuse the variables during the second creation.
 
         Returns:
+            Attended output.
 
         """
         project = tf.layers.dense(
@@ -147,4 +151,4 @@ class Text2ImageMatchingModel:
             bias_initializer=tf.zeros_initializer(),
             reuse=reuse,
         )
-        return tf.matmul(encoded_input, alphas)
+        return tf.matmul(tf.transpose(encoded_input, [0, 2, 1]), alphas)

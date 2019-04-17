@@ -126,7 +126,7 @@ def test_joint_attention(seed, rnn_hidden_size, attn_size1, attn_size2, encoded_
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         attended_shape = sess.run(
-            attention.joint_embedding, feed_dict={input_layer: encoded_input}
+            attention, feed_dict={input_layer: encoded_input}
         ).shape
         assert attended_shape[0] == 5
         assert attended_shape[1] == rnn_hidden_size * 2
