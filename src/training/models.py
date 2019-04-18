@@ -1,4 +1,5 @@
 import tensorflow as tf
+import logging
 from tensorflow.contrib import layers
 from tensorflow.contrib.framework.python.ops import arg_scope
 from tensorflow.contrib.layers.python.layers import layers as layers_lib
@@ -6,6 +7,10 @@ from tensorflow.python.ops import variable_scope
 
 from training.cells import cell_factory
 from training.optimizers import optimizer_factory
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 
 class Text2ImageMatchingModel:
@@ -33,6 +38,7 @@ class Text2ImageMatchingModel:
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
         self.image_encoded = self.image_encoder_graph(images, rnn_hidden_size)
+        logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
             seed,
             captions,
@@ -44,12 +50,14 @@ class Text2ImageMatchingModel:
             num_layers,
             self.keep_prob,
         )
+        logger.info("Text encoder graph created...")
         self.attended_image = self.join_attention_graph(
             seed, attn_size1, attn_size2, self.image_encoded, reuse=False
         )
         self.attended_text = self.join_attention_graph(
             seed, attn_size1, attn_size2, self.text_encoded, reuse=True
         )
+        logger.info("Attention graph created...")
         self.labels = labels
         self.margin = margin
         self.loss = self.compute_loss(
@@ -60,6 +68,7 @@ class Text2ImageMatchingModel:
         )
         self.image_encoder_loader = self.create_image_encoder_loader()
         self.saver.build()
+        logger.info("Graph creation finished...")
 
     @staticmethod
     def image_encoder_graph(images: tf.Tensor, rnn_hidden_size: int) -> tf.Tensor:

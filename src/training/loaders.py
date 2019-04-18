@@ -14,12 +14,12 @@ class CocoTrainValLoader:
         self,
         train_image_paths: List[str],
         train_captions: List[List[int]],
-        train_captions_lengths: List[int],
-        train_labels: List[int],
+        train_captions_lengths: List[List[int]],
+        train_labels: List[List[int]],
         val_image_paths: List[str],
         val_captions: List[List[int]],
-        val_captions_lengths: List[int],
-        val_labels: List[int],
+        val_captions_lengths: List[List[int]],
+        val_labels: List[List[int]],
         batch_size: int,
     ):
         # Build training dataset

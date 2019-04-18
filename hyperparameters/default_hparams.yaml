@@ -1,0 +1,14 @@
+min_unk_sub: 5
+embed_size: 100
+layers: 1
+rnn_hidden_size: 128
+cell: gru
+keep_prob: 0.5
+wd: 0.0001
+learning_rate: 0.001
+opt: adam
+margin: 0.2
+attn_size1: 10
+attn_size2: 20
+gradient_clip_val: 5
+seed: 42
