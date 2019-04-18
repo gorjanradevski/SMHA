@@ -2,7 +2,7 @@ import tensorflow as tf
 from typing import List, Tuple, Generator
 import logging
 
-from utils.constants import WIDTH, HEIGHT, NUM_CHANNELS
+from utils.constants import WIDTH, HEIGHT, NUM_CHANNELS, VGG_MEAN
 
 
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +32,7 @@ class CocoTrainValLoader:
         self.train_dataset = self.train_dataset.shuffle(
             buffer_size=len(self.train_image_paths)
         )
-        self.train_dataset = self.train_dataset.map(self.parse_data)
+        self.train_dataset = self.train_dataset.map(self.parse_data_train)
         self.train_dataset = self.train_dataset.padded_batch(
             batch_size, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
@@ -48,7 +48,7 @@ class CocoTrainValLoader:
             output_types=(tf.string, tf.int32, tf.int32),
             output_shapes=(None, None, None),
         )
-        self.val_dataset = self.val_dataset.map(self.parse_data)
+        self.val_dataset = self.val_dataset.map(self.parse_data_val)
         self.val_dataset = self.val_dataset.padded_batch(
             batch_size, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
@@ -65,14 +65,30 @@ class CocoTrainValLoader:
         logger.info("Iterator created...")
 
     @staticmethod
-    def parse_data(
-        image_path, caption, caption_len
+    def parse_data_train(
+        image_path: str, caption: tf.Tensor, caption_len: tf.Tensor
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         # Parse image
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
         image = tf.image.convert_image_dtype(image, tf.float32)
-        image = tf.image.resize_images(image, [WIDTH, HEIGHT])
+        image = tf.random_crop(image, [WIDTH, HEIGHT, NUM_CHANNELS])
+        image = tf.image.random_flip_left_right(image)
+
+        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
+        image = image - means
+
+        return image, caption, caption_len
+
+    @staticmethod
+    def parse_data_val(image_path: str, caption: tf.Tensor, caption_len: tf.Tensor):
+        image_string = tf.read_file(image_path)
+        image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
+        image = tf.image.convert_image_dtype(image, tf.float32)
+        image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
+
+        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
+        image = image - means
 
         return image, caption, caption_len
 

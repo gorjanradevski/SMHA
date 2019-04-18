@@ -3,10 +3,11 @@ PAD_ID = 0
 UNK_ID = 1
 
 
-# Imagenet image size
+# Imagenet specifics
 WIDTH = 224
 HEIGHT = 224
 NUM_CHANNELS = 3
+VGG_MEAN = [123.68, 116.78, 103.94]
 
 
 # Training specifics
