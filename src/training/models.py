@@ -15,6 +15,8 @@ class Text2ImageMatchingModel:
         images: tf.Tensor,
         captions: tf.Tensor,
         captions_len: tf.Tensor,
+        labels: tf.Tensor,
+        margin: float,
         rnn_hidden_size: int,
         vocab_size: int,
         embedding_size: int,
@@ -48,16 +50,14 @@ class Text2ImageMatchingModel:
         self.attended_text = self.join_attention_graph(
             seed, attn_size1, attn_size2, self.text_encoded, reuse=True
         )
-        """
-        Commented out for now so that the tests pass (After loss is included it will
-        be uncommented).
+        self.labels = labels
+        self.margin = margin
         self.loss = self.compute_loss(
-            self.attended_image, self.attended_text, self.weight_decay
+            self.attended_image, self.attended_text, self.labels, self.margin
         )
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
-        """
         self.image_encoder_loader = self.create_image_encoder_loader()
         self.saver.build()
 
@@ -218,9 +218,105 @@ class Text2ImageMatchingModel:
 
     @staticmethod
     def compute_loss(
-        attended_image: tf.Tensor, attended_text: tf.Tensor, weight_decay: float
+        attended_images: tf.Tensor,
+        attended_texts: tf.Tensor,
+        labels: tf.Tensor,
+        margin: float,
     ) -> tf.Tensor:
-        pass
+        """
+
+        Adapted from: https://omoindrot.github.io/triplet-loss
+
+        Args:
+            attended_images:
+            attended_texts:
+            labels:
+            margin:
+
+        Returns:
+            The triplet loss.
+
+        """
+        embeeding_images = tf.reshape(
+            attended_images,
+            [-1, tf.shape(attended_images)[1] * tf.shape(attended_images)[2]],
+        )
+        embeeding_texts = tf.reshape(
+            attended_texts,
+            [-1, tf.shape(attended_texts)[1] * tf.shape(attended_texts)[2]],
+        )
+        embeddings = tf.concat([embeeding_images, embeeding_texts], 0)
+        # Copy the labels 2 times since the embeddings are stacked on top of each other
+        labels = tf.tile(labels, [2])
+        transposed_embeddings = tf.transpose(embeddings, [1, 0])
+        dot_product = tf.matmul(embeddings, transposed_embeddings)
+        square_norm = tf.diag_part(dot_product)
+
+        # Compute the pairwise distance matrix as we have:
+        # ||a - b||^2 = ||a||^2  - 2 <a, b> + ||b||^2
+        # shape (batch_size, batch_size)
+        distances = (
+            tf.expand_dims(square_norm, 0)
+            - 2.0 * dot_product
+            + tf.expand_dims(square_norm, 1)
+        )
+
+        # Because of computation errors, some distances might be negative so we put
+        # everything >= 0.0
+        pairwise_dist = tf.maximum(distances, 0.0)
+
+        anchor_positive_dist = tf.expand_dims(pairwise_dist, 2)
+        anchor_negative_dist = tf.expand_dims(pairwise_dist, 1)
+
+        # Compute a 3D tensor of size (batch_size, batch_size, batch_size)
+        # triplet_loss[i, j, k] will contain the triplet loss of anchor=i, positive=j,
+        # negative=k
+        # Uses broadcasting where the 1st argument has shape (batch_size, batch_size, 1)
+        # and the 2nd (batch_size, 1, batch_size)
+        triplet_loss = anchor_positive_dist - anchor_negative_dist + margin
+
+        # ------- Triplet mask start ----------
+        # Put to zero the invalid triplets
+        # (where label(a) != label(p) or label(n) == label(a) or a == p)
+        indices_equal = tf.cast(tf.eye(tf.shape(labels)[0]), tf.bool)
+        indices_not_equal = tf.logical_not(indices_equal)
+        i_not_equal_j = tf.expand_dims(indices_not_equal, 2)
+        i_not_equal_k = tf.expand_dims(indices_not_equal, 1)
+        j_not_equal_k = tf.expand_dims(indices_not_equal, 0)
+
+        distinct_indices = tf.logical_and(
+            tf.logical_and(i_not_equal_j, i_not_equal_k), j_not_equal_k
+        )
+
+        # Check if labels[i] == labels[j] and labels[i] != labels[k]
+        label_equal = tf.equal(tf.expand_dims(labels, 0), tf.expand_dims(labels, 1))
+        i_equal_j = tf.expand_dims(label_equal, 2)
+        i_equal_k = tf.expand_dims(label_equal, 1)
+
+        valid_labels = tf.logical_and(i_equal_j, tf.logical_not(i_equal_k))
+
+        # Combine the two masks
+        mask = tf.logical_and(distinct_indices, valid_labels)
+
+        mask = tf.to_float(mask)
+
+        # ----------- Triplet mask end --------------
+
+        triplet_loss_masked = tf.multiply(mask, triplet_loss)
+
+        # Remove negative losses (i.e. the easy triplets)
+        triplet_loss_masked = tf.maximum(triplet_loss_masked, 0.0)
+
+        # Count number of positive triplets (where triplet_loss > 0)
+        valid_triplets = tf.to_float(tf.greater(triplet_loss_masked, 1e-16))
+        num_positive_triplets = tf.reduce_sum(valid_triplets)
+
+        # Get final mean triplet loss over the positive valid triplets
+        triplet_loss_masked_summed = tf.reduce_sum(triplet_loss_masked) / (
+            num_positive_triplets + 1e-16
+        )
+
+        return triplet_loss_masked_summed
 
     @staticmethod
     def apply_gradients_op(

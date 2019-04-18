@@ -13,7 +13,7 @@ def rnn_hidden_size():
 
 @pytest.fixture
 def input_images():
-    return np.random.rand(3, 224, 224, 3)
+    return np.random.rand(3, 224, 224, 3).astype(np.float32)
 
 
 @pytest.fixture
@@ -29,6 +29,16 @@ def captions():
 @pytest.fixture
 def captions_len():
     return np.array([5, 2, 4])
+
+
+@pytest.fixture
+def labels():
+    return np.array([1, 1, 2])
+
+
+@pytest.fixture
+def margin():
+    return 0.0
 
 
 @pytest.fixture
@@ -68,7 +78,7 @@ def attn_size2():
 
 @pytest.fixture
 def encoded_input():
-    return np.random.rand(5, 10, 100)
+    return np.random.rand(5, 10, 100).astype(np.float32)
 
 
 @pytest.fixture
@@ -153,6 +163,8 @@ def test_attended_image_text_shape(
     input_images,
     captions,
     captions_len,
+    labels,
+    margin,
     rnn_hidden_size,
     vocab_size,
     embedding_size,
@@ -170,6 +182,8 @@ def test_attended_image_text_shape(
         input_images,
         captions,
         captions_len,
+        labels,
+        margin,
         rnn_hidden_size,
         vocab_size,
         embedding_size,
