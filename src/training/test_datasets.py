@@ -141,7 +141,7 @@ def test_get_image_paths_and_corresponding_captions(
     CocoDataset.set_up_class_vars(
         id_to_captions_get_image_paths_and_corresponding_captions.values()
     )
-    image_paths, captions, lengths = CocoDataset.get_img_paths_captions_lengths_wrapper(
+    image_paths, captions, lengths, labels = CocoDataset.get_img_paths_captions_lengths_wrapper(
         id_to_filename_true,
         id_to_captions_get_image_paths_and_corresponding_captions,
         min_unk_sub,
@@ -149,6 +149,7 @@ def test_get_image_paths_and_corresponding_captions(
     assert len(image_paths) == 15
     assert len(captions) == 15
     assert len(lengths) == 15
+    assert len(labels) == 15
     for caption in captions:
         assert len(caption) == 2
     for length in lengths:

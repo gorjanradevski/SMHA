@@ -171,9 +171,15 @@ class CocoDataset:
         image_paths = []
         captions = []
         lengths = []
+        labels = []
+        label = 0
         for pair_id in id_to_filename.keys():
             for i in range(5):
                 image_paths.append(id_to_filename[pair_id])
+                # Append the same label for each image and the 5 sentences
+                # Must wrap with a list so that the rank will be the same as the
+                # captions
+                labels.append([label])
                 indexed_caption = [
                     CocoDataset.word2index[word]
                     if CocoDataset.word_freq[word] > min_unk_sub
@@ -184,19 +190,22 @@ class CocoDataset:
                 # Must wrap with a list so that the rank will be the same as the
                 # captions
                 lengths.append([len(indexed_caption)])
+            # Increase the label for the next pair
+            label += 1
 
         assert len(image_paths) == len(captions)
+        assert len(image_paths) == len(labels)
 
-        return image_paths, captions, lengths
+        return image_paths, captions, lengths, labels
 
     def get_img_paths_captions_lengths(
         self
-    ) -> Tuple[List[str], List[List[int]], List[List[int]]]:
-        image_paths, captions, lengths = self.get_img_paths_captions_lengths_wrapper(
+    ) -> Tuple[List[str], List[List[int]], List[List[int]], List[List[int]]]:
+        image_paths, captions, lengths, labels = self.get_img_paths_captions_lengths_wrapper(
             self.id_to_filename, self.id_to_captions, self.min_unk_sub
         )
 
-        return image_paths, captions, lengths
+        return image_paths, captions, lengths, labels
 
     @classmethod
     def get_vocab_size(cls) -> int:

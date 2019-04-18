@@ -27,6 +27,11 @@ def train_captions_lengths():
 
 
 @pytest.fixture
+def train_labels():
+    return [[1], [2], [3], [1], [2]]
+
+
+@pytest.fixture
 def val_image_paths():
     return [
         "data/testing_assets/images_val/COCO_val2014_000000000042.jpg",
@@ -46,6 +51,11 @@ def val_captions_lengths():
 
 
 @pytest.fixture
+def val_labels():
+    return [[1], [2], [3]]
+
+
+@pytest.fixture
 def epochs():
     return 3
 
@@ -59,9 +69,11 @@ def test_loader(
     train_image_paths,
     train_captions,
     train_captions_lengths,
+    train_labels,
     val_image_paths,
     val_captions,
     val_captions_lengths,
+    val_labels,
     epochs,
     batch_size,
 ):
@@ -70,20 +82,22 @@ def test_loader(
         train_image_paths,
         train_captions,
         train_captions_lengths,
+        train_labels,
         val_image_paths,
         val_captions,
         val_captions_lengths,
+        val_labels,
         batch_size,
     )
-    images, captions, captions_lengths = loader.get_next()
+    images, captions, captions_lengths, labels = loader.get_next()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for e in range(epochs):
             sess.run(loader.train_init)
             try:
                 while True:
-                    images_batch, captions_batch, captions_lengths_batch = sess.run(
-                        [images, captions, captions_lengths]
+                    images_batch, captions_batch, captions_lengths_batch, labels_batch = sess.run(
+                        [images, captions, captions_lengths, labels]
                     )
                     _, width, height, _ = images_batch.shape
                     assert width == 224
@@ -93,13 +107,15 @@ def test_loader(
                         assert caption.shape[0] == num_tokens_batch
                     for caption, length in zip(captions_batch, captions_lengths_batch):
                         assert np.count_nonzero(caption) == length
+                    for label in labels_batch:
+                        pass
             except tf.errors.OutOfRangeError:
                 pass
             sess.run(loader.val_init)
             try:
                 while True:
-                    images_batch, captions_batch, captions_lengths_batch = sess.run(
-                        [images, captions, captions_lengths]
+                    images_batch, captions_batch, captions_lengths_batch, labels_batch = sess.run(
+                        [images, captions, captions_lengths, labels]
                     )
                     _, width, height, _ = images_batch.shape
                     assert width == 224
@@ -109,5 +125,7 @@ def test_loader(
                         assert caption.shape[0] == num_tokens_batch
                     for caption, length in zip(captions_batch, captions_lengths_batch):
                         assert np.count_nonzero(caption) == length
+                    for label in labels_batch:
+                        pass
             except tf.errors.OutOfRangeError:
                 pass
