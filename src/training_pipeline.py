@@ -216,7 +216,7 @@ def parse_args():
         help="The number of epochs to train the model.",
     )
     parser.add_argument(
-        "--batch_Size", type=int, default=64, help="The size of the batch."
+        "--batch_size", type=int, default=64, help="The size of the batch."
     )
 
     return parser.parse_args()
