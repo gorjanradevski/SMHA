@@ -126,6 +126,7 @@ def train(
                         )
                         evaluator_train.update_metrics(loss)
                         pbar.update(len(labels))
+                        pbar.set_postfix({"Batch loss": loss})
             except tf.errors.OutOfRangeError:
                 pass
 
