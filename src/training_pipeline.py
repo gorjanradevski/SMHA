@@ -10,8 +10,6 @@ from training.loaders import CocoTrainValLoader
 from training.models import Text2ImageMatchingModel
 from training.evaluators import Evaluator
 
-from utils.constants import BATCH_SIZE
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -27,6 +25,7 @@ def train(
     val_images_path: str,
     val_json_path: str,
     epochs: int,
+    batch_size: int,
 ) -> None:
     """Starts a training session.
 
@@ -37,6 +36,7 @@ def train(
         val_images_path: The path to the validation images.
         val_json_path: The path to the validation annotations.
         epochs: The number of epochs to train the model.
+        batch_size: The batch size to be used.
 
     Returns:
         None
@@ -79,7 +79,7 @@ def train(
         val_captions,
         val_captions_lengths,
         val_labels,
-        BATCH_SIZE,
+        batch_size,
     )
     images, captions, captions_lengths, labels = loader.get_next()
     logger.info("Loader created...")
@@ -155,6 +155,7 @@ def main():
         args.val_images_path,
         args.val_json_path,
         args.epochs,
+        args.batch_size,
     )
 
 
@@ -213,6 +214,9 @@ def parse_args():
         type=int,
         default=10,
         help="The number of epochs to train the model.",
+    )
+    parser.add_argument(
+        "--batch_Size", type=int, default=64, help="The size of the batch."
     )
 
     return parser.parse_args()

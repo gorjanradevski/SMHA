@@ -8,7 +8,3 @@ WIDTH = 224
 HEIGHT = 224
 NUM_CHANNELS = 3
 VGG_MEAN = [123.68, 116.78, 103.94]
-
-
-# Training specifics
-BATCH_SIZE = 64
