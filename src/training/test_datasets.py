@@ -137,6 +137,7 @@ def test_get_image_paths_and_corresponding_captions(
     id_to_filename_true,
     id_to_captions_get_image_paths_and_corresponding_captions,
     min_unk_sub,
+    train,
 ):
     CocoDataset.set_up_class_vars(
         id_to_captions_get_image_paths_and_corresponding_captions.values()
@@ -145,6 +146,7 @@ def test_get_image_paths_and_corresponding_captions(
         id_to_filename_true,
         id_to_captions_get_image_paths_and_corresponding_captions,
         min_unk_sub,
+        train,
     )
     assert len(image_paths) == 15
     assert len(captions) == 15

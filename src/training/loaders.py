@@ -6,7 +6,7 @@ from utils.constants import WIDTH, HEIGHT, NUM_CHANNELS, VGG_MEAN
 
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class CocoTrainValLoader:
@@ -78,7 +78,7 @@ class CocoTrainValLoader:
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
         image = tf.image.convert_image_dtype(image, tf.float32)
-        image = tf.random_crop(image, [WIDTH, HEIGHT, NUM_CHANNELS])
+        image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
         image = tf.image.random_flip_left_right(image)
 
         means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
@@ -120,5 +120,9 @@ class CocoTrainValLoader:
 
     def get_next(self) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         images, captions, captions_lengths, labels = self.iterator.get_next()
+        # Squeeze the redundant dimension of captions_lengths and labels because they
+        # were added just so the padded_batch function will work
+        captions_lengths = tf.squeeze(captions_lengths, axis=1)
+        labels = tf.squeeze(labels, axis=1)
 
         return images, captions, captions_lengths, labels

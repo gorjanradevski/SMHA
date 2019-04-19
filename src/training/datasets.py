@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Tuple, ValuesView
 from utils.constants import PAD_ID, UNK_ID
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class CocoDataset:
@@ -27,6 +27,7 @@ class CocoDataset:
         """
         json_file = self.read_json(json_path)
         self.min_unk_sub = min_unk_sub
+        self.train = train
         logger.info("Object variables set...")
         self.id_to_filename = self.parse_image_paths(json_file, images_path)
         self.id_to_captions = self.parse_captions(json_file)
@@ -146,7 +147,7 @@ class CocoDataset:
 
     @staticmethod
     def get_img_paths_captions_lengths_wrapper(
-        id_to_filename, id_to_captions, min_unk_sub
+        id_to_filename, id_to_captions, min_unk_sub, train
     ):
         """Returns the image paths and captions.
 
@@ -162,6 +163,7 @@ class CocoDataset:
             id_to_captions: Pair id to captions dict.
             min_unk_sub: Minimum numbed of times a word has to appear in order to be
             left in the dataset.
+            train: Whether the retrieval is from training or from validation dataset.
 
         Returns:
             The image paths, the captions and the lengths of the captions.
@@ -180,12 +182,21 @@ class CocoDataset:
                 # Must wrap with a list so that the rank will be the same as the
                 # captions
                 labels.append([label])
-                indexed_caption = [
-                    CocoDataset.word2index[word]
-                    if CocoDataset.word_freq[word] > min_unk_sub
-                    else 0
-                    for word in id_to_captions[pair_id][i]
-                ]
+                indexed_caption = (
+                    [
+                        CocoDataset.word2index[word]
+                        if CocoDataset.word_freq[word] > min_unk_sub
+                        else 0
+                        for word in id_to_captions[pair_id][i]
+                    ]
+                    if train
+                    else [
+                        CocoDataset.word2index[word]
+                        if word in CocoDataset.word2index.keys()
+                        else 0
+                        for word in id_to_captions[pair_id][i]
+                    ]
+                )
                 captions.append(indexed_caption)
                 # Must wrap with a list so that the rank will be the same as the
                 # captions
@@ -195,14 +206,13 @@ class CocoDataset:
 
         assert len(image_paths) == len(captions)
         assert len(image_paths) == len(labels)
-
         return image_paths, captions, lengths, labels
 
     def get_img_paths_captions_lengths(
         self
     ) -> Tuple[List[str], List[List[int]], List[List[int]], List[List[int]]]:
         image_paths, captions, lengths, labels = self.get_img_paths_captions_lengths_wrapper(
-            self.id_to_filename, self.id_to_captions, self.min_unk_sub
+            self.id_to_filename, self.id_to_captions, self.min_unk_sub, self.train
         )
 
         return image_paths, captions, lengths, labels

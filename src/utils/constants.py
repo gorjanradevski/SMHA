@@ -11,4 +11,4 @@ VGG_MEAN = [123.68, 116.78, 103.94]
 
 
 # Training specifics
-BATCH_SIZE = 64
+BATCH_SIZE = 4

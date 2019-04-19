@@ -1,17 +1,21 @@
 import tensorflow as tf
 import argparse
 import logging
+from tqdm import tqdm
+import os
 
 from training.datasets import CocoDataset
 from training.hyperparameters import YParams
 from training.loaders import CocoTrainValLoader
 from training.models import Text2ImageMatchingModel
+from training.evaluators import Evaluator
 
 from utils.constants import BATCH_SIZE
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
-
+logger = logging.getLogger(__name__)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 # TODO: Experiment name generation method
 
@@ -57,6 +61,11 @@ def train(
     )
     logger.info("Validation dataset created...")
 
+    evaluator_train = Evaluator()
+    evaluator_val = Evaluator()
+
+    logger.info("Evaluators created...")
+
     # Resetting the default graph and setting the random seed
     tf.reset_default_graph()
     tf.set_random_seed(hparams.seed)
@@ -75,7 +84,7 @@ def train(
     images, captions, captions_lengths, labels = loader.get_next()
     logger.info("Loader created...")
 
-    _ = Text2ImageMatchingModel(
+    model = Text2ImageMatchingModel(
         hparams.seed,
         images,
         captions,
@@ -84,21 +93,54 @@ def train(
         hparams.margin,
         hparams.rnn_hidden_size,
         vocab_size,
-        hparams.embedding_size,
+        hparams.embed_size,
         hparams.cell,
         hparams.layers,
         hparams.attn_size1,
         hparams.attn_size2,
         hparams.opt,
         hparams.learning_rate,
-        hparams.gradient_clip_cal,
+        hparams.gradient_clip_val,
     )
     logger.info("Model created...")
     logger.info("Training is starting...")
 
-    for e in range(epochs):
-        # TODO: Training pipeline
-        pass
+    with tf.Session() as sess:
+
+        # Initialize all variables in the graph
+        model.init(sess)
+
+        for e in range(epochs):
+
+            # Reset evaluators
+            evaluator_train.reset_metrics()
+            evaluator_val.reset_metrics()
+
+            # Initialize iterator with training data
+            sess.run(loader.train_init)
+            try:
+                with tqdm(total=len(train_labels)) as pbar:
+                    while True:
+                        _, loss, labels = sess.run(
+                            [model.optimize, model.loss, model.labels]
+                        )
+                        evaluator_train.update_metrics(loss)
+                        pbar.update(len(labels))
+            except tf.errors.OutOfRangeError:
+                pass
+
+            # Initialize iterator with validation data
+            sess.run(loader.val_init)
+            try:
+                while True:
+                    loss = sess.run(model.loss)
+                    evaluator_val.update_metrics(loss)
+            except tf.errors.OutOfRangeError:
+                pass
+
+            if evaluator_val.is_best_loss():
+                logger.info(f"Loss on epoch {e}: {evaluator_val.best_loss}")
+                evaluator_val.update_best_loss()
 
 
 def main():
@@ -154,9 +196,15 @@ def parse_args():
         help="Path where the val json file with the captions and image ids.",
     )
     parser.add_argument(
-        "--val_json_path",
+        "--log_model_path",
         type=str,
-        default="data/annotations/captions_val2014.json",
+        default="logs/",
+        help="Path where the val json file with the captions and image ids.",
+    )
+    parser.add_argument(
+        "--save_model_path",
+        type=str,
+        default="models/",
         help="Path where the val json file with the captions and image ids.",
     )
     parser.add_argument(

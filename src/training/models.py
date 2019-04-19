@@ -1,5 +1,6 @@
 import tensorflow as tf
 import logging
+
 from tensorflow.contrib import layers
 from tensorflow.contrib.framework.python.ops import arg_scope
 from tensorflow.contrib.layers.python.layers import layers as layers_lib
@@ -10,7 +11,7 @@ from training.optimizers import optimizer_factory
 
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class Text2ImageMatchingModel:
@@ -33,16 +34,21 @@ class Text2ImageMatchingModel:
         learning_rate: float,
         clip_value: int,
     ):
+        # Get images, captions, lengths and labels
+        self.images = images
+        self.captions = captions
+        self.captions_len = captions_len
+        self.labels = labels
         # Define global saver
         self.saver = tf.train.Saver(defer_build=True)
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
-        self.image_encoded = self.image_encoder_graph(images, rnn_hidden_size)
+        self.image_encoded = self.image_encoder_graph(self.images, rnn_hidden_size)
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
             seed,
-            captions,
-            captions_len,
+            self.captions,
+            self.captions_len,
             vocab_size,
             embedding_size,
             cell_type,
@@ -58,7 +64,6 @@ class Text2ImageMatchingModel:
             seed, attn_size1, attn_size2, self.text_encoded, reuse=True
         )
         logger.info("Attention graph created...")
-        self.labels = labels
         self.margin = margin
         self.loss = self.compute_loss(
             self.attended_image, self.attended_text, self.labels, self.margin
