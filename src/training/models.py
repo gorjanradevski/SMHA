@@ -41,8 +41,6 @@ class Text2ImageMatchingModel:
         self.captions = captions
         self.captions_len = captions_len
         self.labels = labels
-        # Define global saver
-        self.saver = tf.train.Saver(defer_build=True)
         # Create summary writers
         self.file_writer = tf.summary.FileWriter(log_dir)
         self.train_loss_ph, self.train_loss_summary = self.create_summary("train_loss")
@@ -79,8 +77,9 @@ class Text2ImageMatchingModel:
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
+        # Imagenet graph loader and graph saver
         self.image_encoder_loader = self.create_image_encoder_loader()
-        self.saver.build()
+        self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")
 
     @staticmethod
@@ -375,19 +374,26 @@ class Text2ImageMatchingModel:
 
         return tf.train.Saver(variables_to_restore)
 
-    def init(self, sess: tf.Session, pretrain_imagenet_path: str) -> None:
+    def init(
+        self, sess: tf.Session, checkpoint_path: str, imagenet_checkpoint: bool
+    ) -> None:
         """Initializes all variables in the graph.
 
         Args:
             sess: The active session.
-            pretrain_imagenet_path: Path to the graph pretrained on imagenet.
+            checkpoint_path: Path to a valid checkpoint.
+            imagenet_checkpoint: Whether the checkpoint points to a model pretrained on
+            imagenet or a full model.
 
         Returns:
             None
 
         """
         sess.run(tf.global_variables_initializer())
-        self.image_encoder_loader.restore(sess, pretrain_imagenet_path)
+        if imagenet_checkpoint:
+            self.image_encoder_loader.restore(sess, checkpoint_path)
+        else:
+            self.saver_loader.restore(sess, checkpoint_path)
 
     def add_summary_graph(self, sess: tf.Session) -> None:
         """Adds the graph to tensorboard.
@@ -440,4 +446,4 @@ class Text2ImageMatchingModel:
         Returns:
 
         """
-        self.saver.save(sess, save_path)
+        self.saver_loader.save(sess, save_path)

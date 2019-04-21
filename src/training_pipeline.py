@@ -26,9 +26,10 @@ def train(
     val_json_path: str,
     epochs: int,
     batch_size: int,
-    pretrained_imagenet_path: str,
+    checkpoint_path: str,
+    imagenet_checkpoint: bool,
     save_model_path: str,
-    log_path: str,
+    log_model_path: str,
 ) -> None:
     """Starts a training session.
 
@@ -40,7 +41,8 @@ def train(
         val_json_path: The path to the validation annotations.
         epochs: The number of epochs to train the model.
         batch_size: The batch size to be used.
-        pretrained_imagenet_path: Path to the model pretrained on imagenet.
+        checkpoint_path: Path to a valid model checkpoint.
+        imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
 
@@ -108,7 +110,7 @@ def train(
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
-        log_path,
+        log_model_path,
     )
     logger.info("Model created...")
     logger.info("Training is starting...")
@@ -116,7 +118,7 @@ def train(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, pretrained_imagenet_path)
+        model.init(sess, checkpoint_path, imagenet_checkpoint)
         model.add_summary_graph(sess)
 
         for e in range(epochs):
@@ -143,7 +145,7 @@ def train(
                 model.train_loss_summary,
                 feed_dict={model.train_loss_ph: evaluator_train.loss},
             )
-            model.add_summary(train_loss_summary, e)
+            model.add_summary(train_loss_summary, e + 1)
 
             # Initialize iterator with validation data
             sess.run(loader.val_init)
@@ -161,12 +163,12 @@ def train(
                 model.val_loss_summary,
                 feed_dict={model.val_loss_ph: evaluator_val.loss},
             )
-            model.add_summary(val_loss_summary, e)
+            model.add_summary(val_loss_summary, e + 1)
 
             if evaluator_val.is_best_loss():
                 logger.info("=============================")
                 logger.info(
-                    f"Found new best on epoch {e} with loss: "
+                    f"Found new best on epoch {e+1} with loss: "
                     f"{evaluator_val.best_loss}! Saving model..."
                 )
                 logger.info("=============================")
@@ -186,7 +188,8 @@ def main():
         args.val_json_path,
         args.epochs,
         args.batch_size,
-        args.pretrained_imagenet_path,
+        args.checkpoint_path,
+        args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
     )
@@ -231,10 +234,15 @@ def parse_args():
         help="Path where the val json file with the captions and image ids.",
     )
     parser.add_argument(
-        "--pretrained_imagenet_path",
+        "--checkpoint_path",
         type=str,
         default="models/image_encoders/vgg_16.ckpt",
-        help="Where to log the summaries.",
+        help="Path to a model checkpoint.",
+    )
+    parser.add_argument(
+        "--imagenet_checkpoint",
+        action="store_true",
+        help="If the checkpoint is an imagenet checkpoint.",
     )
     parser.add_argument(
         "--log_model_path",
@@ -245,7 +253,7 @@ def parse_args():
     parser.add_argument(
         "--save_model_path",
         type=str,
-        default="models/",
+        default="models/tryout",
         help="Where to save the model.",
     )
     parser.add_argument(
