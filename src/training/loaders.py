@@ -35,12 +35,14 @@ class CocoTrainValLoader:
         self.train_dataset = self.train_dataset.shuffle(
             buffer_size=len(self.train_image_paths)
         )
-        self.train_dataset = self.train_dataset.map(self.parse_data_train)
+        self.train_dataset = self.train_dataset.map(
+            self.parse_data_train, num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
         self.train_dataset = self.train_dataset.padded_batch(
             batch_size,
             padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
         )
-        self.train_dataset = self.train_dataset.prefetch(2)
+        self.train_dataset = self.train_dataset.prefetch(5)
         logger.info("Training dataset created...")
 
         # Build validation dataset
@@ -53,12 +55,14 @@ class CocoTrainValLoader:
             output_types=(tf.string, tf.int32, tf.int32, tf.int32),
             output_shapes=(None, None, None, None),
         )
-        self.val_dataset = self.val_dataset.map(self.parse_data_val)
+        self.val_dataset = self.val_dataset.map(
+            self.parse_data_val, num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
         self.val_dataset = self.val_dataset.padded_batch(
             batch_size,
             padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
         )
-        self.val_dataset = self.val_dataset.prefetch(2)
+        self.val_dataset = self.val_dataset.prefetch(5)
         logger.info("Validation dataset created...")
 
         self.iterator = tf.data.Iterator.from_structure(
