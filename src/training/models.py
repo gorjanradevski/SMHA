@@ -372,9 +372,6 @@ class Text2ImageMatchingModel:
         variables_to_restore = tf.contrib.framework.get_variables_to_restore(
             include=["vgg_16"]
         )
-        for variable_to_restore in variables_to_restore:
-            print(variable_to_restore)
-        print(len(variables_to_restore))
 
         return tf.train.Saver(variables_to_restore)
 

@@ -166,8 +166,8 @@ def train(
             if evaluator_val.is_best_loss():
                 logger.info("=============================")
                 logger.info(
-                    f"Found new best on epoch {e} with loss: {evaluator_val.best_loss}!\
-                     Saving model..."
+                    f"Found new best on epoch {e} with loss: "
+                    f"{evaluator_val.best_loss}! Saving model..."
                 )
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
