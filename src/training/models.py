@@ -398,7 +398,7 @@ class Text2ImageMatchingModel:
             None
 
         """
-        self.file_writer.add_event(sess.graph)
+        self.file_writer.add_graph(sess.graph)
 
     @staticmethod
     def create_summary(name: str) -> Tuple[tf.placeholder, tf.summary.scalar]:
