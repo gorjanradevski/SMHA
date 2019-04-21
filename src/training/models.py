@@ -99,9 +99,7 @@ class Text2ImageMatchingModel:
             The encoded image.
 
         """
-        with variable_scope.variable_scope(
-            "image_encoder", "image_encoder", [images]
-        ) as sc:
+        with variable_scope.variable_scope("vgg_16", "vgg_16", [images]) as sc:
             end_points_collection = sc.original_name_scope + "_end_points"
             with arg_scope(
                 [layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
@@ -129,20 +127,21 @@ class Text2ImageMatchingModel:
                 image_feature_extractor = layers_lib.max_pool2d(
                     net, [2, 2], scope="pool5"
                 )
-                project_layer = tf.layers.dense(
-                    image_feature_extractor, 2 * rnn_hidden_size, name="project_image"
-                )
-                return tf.cast(
-                    tf.reshape(
-                        project_layer,
-                        [
-                            -1,
-                            project_layer.shape[1] * project_layer.shape[2],
-                            2 * rnn_hidden_size,
-                        ],
-                    ),
-                    tf.float32,
-                )
+
+        project_layer = tf.layers.dense(
+            image_feature_extractor, 2 * rnn_hidden_size, name="project_image"
+        )
+        return tf.cast(
+            tf.reshape(
+                project_layer,
+                [
+                    -1,
+                    project_layer.shape[1] * project_layer.shape[2],
+                    2 * rnn_hidden_size,
+                ],
+            ),
+            tf.float32,
+        )
 
     @staticmethod
     def text_encoder_graph(
@@ -245,15 +244,15 @@ class Text2ImageMatchingModel:
         labels: tf.Tensor,
         margin: float,
     ) -> tf.Tensor:
-        """
+        """Computes the triplet loss.
 
         Adapted from: https://omoindrot.github.io/triplet-loss
 
         Args:
-            attended_images:
-            attended_texts:
-            labels:
-            margin:
+            attended_images: The embedded images.
+            attended_texts: The embedded sentences.
+            labels: The labels.
+            margin: The contrastive margin.
 
         Returns:
             The triplet loss.
@@ -371,22 +370,27 @@ class Text2ImageMatchingModel:
 
         """
         variables_to_restore = tf.contrib.framework.get_variables_to_restore(
-            exclude=["image_encoder/project_image/", "text_encoder/", "join_attention/"]
+            include=["vgg_16"]
         )
+        for variable_to_restore in variables_to_restore:
+            print(variable_to_restore)
+        print(len(variables_to_restore))
+
         return tf.train.Saver(variables_to_restore)
 
-    @staticmethod
-    def init(sess: tf.Session) -> None:
+    def init(self, sess: tf.Session, pretrain_imagenet_path: str) -> None:
         """Initializes all variables in the graph.
 
         Args:
             sess: The active session.
+            pretrain_imagenet_path: Path to the graph pretrained on imagenet.
 
         Returns:
             None
 
         """
         sess.run(tf.global_variables_initializer())
+        self.image_encoder_loader.restore(sess, pretrain_imagenet_path)
 
     def add_summary_graph(self, sess: tf.Session) -> None:
         """Adds the graph to tensorboard.

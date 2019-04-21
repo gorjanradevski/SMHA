@@ -26,8 +26,9 @@ def train(
     val_json_path: str,
     epochs: int,
     batch_size: int,
+    pretrained_imagenet_path: str,
     save_model_path: str,
-    log_path: str = None,
+    log_path: str,
 ) -> None:
     """Starts a training session.
 
@@ -39,8 +40,10 @@ def train(
         val_json_path: The path to the validation annotations.
         epochs: The number of epochs to train the model.
         batch_size: The batch size to be used.
+        pretrained_imagenet_path: Path to the model pretrained on imagenet.
         save_model_path: Where to save the model.
-        save_model_path: Where to log the summaries.
+        log_model_path: Where to log the summaries.
+
 
     Returns:
         None
@@ -111,8 +114,9 @@ def train(
     logger.info("Training is starting...")
 
     with tf.Session() as sess:
-        # Basic initializers
-        model.init(sess)
+
+        # Initializers
+        model.init(sess, pretrained_imagenet_path)
         model.add_summary_graph(sess)
 
         for e in range(epochs):
@@ -182,6 +186,7 @@ def main():
         args.val_json_path,
         args.epochs,
         args.batch_size,
+        args.pretrained_imagenet_path,
         args.save_model_path,
         args.log_model_path,
     )
@@ -224,6 +229,12 @@ def parse_args():
         type=str,
         default="data/annotations/captions_val2014.json",
         help="Path where the val json file with the captions and image ids.",
+    )
+    parser.add_argument(
+        "--pretrained_imagenet_path",
+        type=str,
+        default="models/image_encoders/vgg_16.ckpt",
+        help="Where to log the summaries.",
     )
     parser.add_argument(
         "--log_model_path",
