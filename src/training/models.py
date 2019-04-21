@@ -41,10 +41,11 @@ class Text2ImageMatchingModel:
         self.captions = captions
         self.captions_len = captions_len
         self.labels = labels
-        # Create summary writers
+        # Create summary writers and global step
         self.file_writer = tf.summary.FileWriter(log_dir)
         self.train_loss_ph, self.train_loss_summary = self.create_summary("train_loss")
         self.val_loss_ph, self.val_loss_summary = self.create_summary("val_loss")
+        self.global_step = tf.Variable(0, trainable=False, name="global_step")
         # Create dropout and weight decay placeholder
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
@@ -338,9 +339,12 @@ class Text2ImageMatchingModel:
 
         return triplet_loss_masked_summed
 
-    @staticmethod
     def apply_gradients_op(
-        loss: tf.Tensor, optimizer_type: str, learning_rate: float, clip_value: int
+        self,
+        loss: tf.Tensor,
+        optimizer_type: str,
+        learning_rate: float,
+        clip_value: int,
     ) -> tf.Operation:
         """Applies the gradients on the variables.
 
@@ -358,7 +362,9 @@ class Text2ImageMatchingModel:
         gradients, variables = zip(*optimizer.compute_gradients(loss))
         gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
 
-        return optimizer.apply_gradients(zip(gradients, variables))
+        return optimizer.apply_gradients(
+            zip(gradients, variables), global_step=self.global_step
+        )
 
     @staticmethod
     def create_image_encoder_loader():
@@ -423,18 +429,20 @@ class Text2ImageMatchingModel:
 
         return input_ph, summary
 
-    def add_summary(self, value: float, epoch: int) -> None:
+    def add_summary(self, sess: tf.Session, value: float) -> None:
         """Writes the summary to tensorboard.
 
         Args:
+            sess: The active session.
             value: The value to write.
-            epoch: The epoch when the value was measured.
 
         Returns:
             None
 
         """
-        self.file_writer.add_summary(value, epoch)
+        self.file_writer.add_summary(
+            value, tf.train.global_step(sess, self.global_step)
+        )
 
     def save_model(self, sess: tf.Session, save_path: str) -> None:
         """Dumps the model definition.

@@ -145,7 +145,7 @@ def train(
                 model.train_loss_summary,
                 feed_dict={model.train_loss_ph: evaluator_train.loss},
             )
-            model.add_summary(train_loss_summary, e + 1)
+            model.add_summary(train_loss_summary, sess)
 
             # Initialize iterator with validation data
             sess.run(loader.val_init)
@@ -163,7 +163,7 @@ def train(
                 model.val_loss_summary,
                 feed_dict={model.val_loss_ph: evaluator_val.loss},
             )
-            model.add_summary(val_loss_summary, e + 1)
+            model.add_summary(val_loss_summary, sess)
 
             if evaluator_val.is_best_loss():
                 logger.info("=============================")
