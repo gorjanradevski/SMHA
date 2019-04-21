@@ -415,7 +415,7 @@ class Text2ImageMatchingModel:
             The summary placeholder and it's node counterpart.
 
         """
-        input_ph = tf.placeholder(tf.float32, shape=None, name="loss_summary")
+        input_ph = tf.placeholder(tf.float32, shape=None, name=name + "_pl")
         summary = tf.summary.scalar(name, input_ph)
 
         return input_ph, summary
