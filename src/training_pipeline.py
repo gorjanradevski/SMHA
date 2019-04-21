@@ -26,6 +26,8 @@ def train(
     val_json_path: str,
     epochs: int,
     batch_size: int,
+    save_model_path: str,
+    log_path: str = None,
 ) -> None:
     """Starts a training session.
 
@@ -37,6 +39,8 @@ def train(
         val_json_path: The path to the validation annotations.
         epochs: The number of epochs to train the model.
         batch_size: The batch size to be used.
+        save_model_path: Where to save the model.
+        save_model_path: Where to log the summaries.
 
     Returns:
         None
@@ -101,17 +105,17 @@ def train(
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
+        log_path,
     )
     logger.info("Model created...")
     logger.info("Training is starting...")
 
     with tf.Session() as sess:
-
-        # Initialize all variables in the graph
+        # Basic initializers
         model.init(sess)
+        model.add_summary_graph(sess)
 
         for e in range(epochs):
-
             # Reset evaluators
             evaluator_train.reset_metrics()
             evaluator_val.reset_metrics()
@@ -130,17 +134,39 @@ def train(
             except tf.errors.OutOfRangeError:
                 pass
 
+            # Write training summaries
+            train_loss_summary = sess.run(
+                model.train_loss_summary,
+                feed_dict={model.train_loss_ph: evaluator_train.loss},
+            )
+            model.add_summary(train_loss_summary, e)
+
             # Initialize iterator with validation data
             sess.run(loader.val_init)
             try:
-                while True:
-                    loss = sess.run(model.loss)
-                    evaluator_val.update_metrics(loss)
+                with tqdm(total=len(val_labels)) as pbar:
+                    while True:
+                        loss, labels = sess.run([model.loss, model.labels])
+                        evaluator_val.update_metrics(loss)
+                        pbar.update(len(labels))
             except tf.errors.OutOfRangeError:
                 pass
 
+            # Write validation summaries
+            val_loss_summary = sess.run(
+                model.val_loss_summary,
+                feed_dict={model.val_loss_ph: evaluator_val.loss},
+            )
+            model.add_summary(val_loss_summary, e)
+
             if evaluator_val.is_best_loss():
-                logger.info(f"Loss on epoch {e}: {evaluator_val.best_loss}")
+                logger.info("=============================")
+                logger.info(
+                    f"Found new best on epoch {e} with loss: {evaluator_val.best_loss}!\
+                     Saving model..."
+                )
+                logger.info("=============================")
+                model.save_model(sess, save_model_path)
                 evaluator_val.update_best_loss()
 
 
@@ -156,6 +182,8 @@ def main():
         args.val_json_path,
         args.epochs,
         args.batch_size,
+        args.save_model_path,
+        args.log_model_path,
     )
 
 
@@ -201,13 +229,13 @@ def parse_args():
         "--log_model_path",
         type=str,
         default="logs/",
-        help="Path where the val json file with the captions and image ids.",
+        help="Where to log the summaries.",
     )
     parser.add_argument(
         "--save_model_path",
         type=str,
         default="models/",
-        help="Path where the val json file with the captions and image ids.",
+        help="Where to save the model.",
     )
     parser.add_argument(
         "--epochs",

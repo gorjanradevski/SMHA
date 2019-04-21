@@ -1,5 +1,6 @@
 import tensorflow as tf
 import logging
+from typing import Tuple
 
 from tensorflow.contrib import layers
 from tensorflow.contrib.framework.python.ops import arg_scope
@@ -33,6 +34,7 @@ class Text2ImageMatchingModel:
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
+        log_dir: str = None,
     ):
         # Get images, captions, lengths and labels
         self.images = images
@@ -41,8 +43,14 @@ class Text2ImageMatchingModel:
         self.labels = labels
         # Define global saver
         self.saver = tf.train.Saver(defer_build=True)
+        # Create summary writers
+        self.file_writer = tf.summary.FileWriter(log_dir)
+        self.train_loss_ph, self.train_loss_summary = self.create_summary("train_loss")
+        self.val_loss_ph, self.val_loss_summary = self.create_summary("val_loss")
+        # Create dropout and weight decay placeholder
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
+        # Build model
         self.image_encoded = self.image_encoder_graph(self.images, rnn_hidden_size)
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
@@ -379,3 +387,56 @@ class Text2ImageMatchingModel:
 
         """
         sess.run(tf.global_variables_initializer())
+
+    def add_summary_graph(self, sess: tf.Session) -> None:
+        """Adds the graph to tensorboard.
+
+        Args:
+            sess: The active session.
+
+        Returns:
+            None
+
+        """
+        self.file_writer.add_event(sess.graph)
+
+    @staticmethod
+    def create_summary(name: str) -> Tuple[tf.placeholder, tf.summary.scalar]:
+        """Creates summary placeholder and node.
+
+        Args:
+            name: The name of the summary.
+
+        Returns:
+            The summary placeholder and it's node counterpart.
+
+        """
+        input_ph = tf.placeholder(tf.float32, shape=None, name="loss_summary")
+        summary = tf.summary.scalar(name, input_ph)
+
+        return input_ph, summary
+
+    def add_summary(self, value: float, epoch: int) -> None:
+        """Writes the summary to tensorboard.
+
+        Args:
+            value: The value to write.
+            epoch: The epoch when the value was measured.
+
+        Returns:
+            None
+
+        """
+        self.file_writer.add_summary(value, epoch)
+
+    def save_model(self, sess: tf.Session, save_path: str) -> None:
+        """Dumps the model definition.
+
+        Args:
+            sess: The active session.
+            save_path: Where to save the model.
+
+        Returns:
+
+        """
+        self.saver.save(sess, save_path)
