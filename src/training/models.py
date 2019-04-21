@@ -77,7 +77,7 @@ class Text2ImageMatchingModel:
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
-        # Imagenet graph loader and graph saver
+        # Imagenet graph loader and graph saver/loader
         self.image_encoder_loader = self.create_image_encoder_loader()
         self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")

@@ -247,7 +247,7 @@ def parse_args():
     parser.add_argument(
         "--log_model_path",
         type=str,
-        default="logs/",
+        default="logs/tryout",
         help="Where to log the summaries.",
     )
     parser.add_argument(
