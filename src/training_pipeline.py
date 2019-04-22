@@ -213,6 +213,7 @@ def main():
         args.save_model_path,
         args.log_model_path,
         args.recall_at,
+        args.val_size,
     )
 
 
