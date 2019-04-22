@@ -146,8 +146,8 @@ class CocoDataset:
         cls.index2word = dict(zip(cls.word2index.values(), cls.word2index.keys()))
 
     @staticmethod
-    def get_img_paths_captions_lengths_wrapper(
-        id_to_filename, id_to_captions, min_unk_sub, train
+    def get_imgpaths_caps_lens_labs_wrap(
+        id_to_filename, id_to_captions, min_unk_sub, train, size: int = None
     ):
         """Returns the image paths and captions.
 
@@ -164,6 +164,7 @@ class CocoDataset:
             min_unk_sub: Minimum numbed of times a word has to appear in order to be
             left in the dataset.
             train: Whether the retrieval is from training or from validation dataset.
+            size: How many instances to return (all by default).
 
         Returns:
             The image paths, the captions and the lengths of the captions.
@@ -175,6 +176,8 @@ class CocoDataset:
         lengths = []
         labels = []
         label = 0
+        if size is None:
+            size = len(id_to_filename.keys()) * 5
         for pair_id in id_to_filename.keys():
             for i in range(5):
                 image_paths.append(id_to_filename[pair_id])
@@ -206,13 +209,23 @@ class CocoDataset:
 
         assert len(image_paths) == len(captions)
         assert len(image_paths) == len(labels)
-        return image_paths, captions, lengths, labels
+
+        return (
+            image_paths[: size * 5],
+            captions[: size * 5],
+            lengths[: size * 5],
+            labels[: size * 5],
+        )
 
     def get_img_paths_captions_lengths(
-        self
+        self, val_size: int = None
     ) -> Tuple[List[str], List[List[int]], List[List[int]], List[List[int]]]:
-        image_paths, captions, lengths, labels = self.get_img_paths_captions_lengths_wrapper(
-            self.id_to_filename, self.id_to_captions, self.min_unk_sub, self.train
+        image_paths, captions, lengths, labels = self.get_imgpaths_caps_lens_labs_wrap(
+            self.id_to_filename,
+            self.id_to_captions,
+            self.min_unk_sub,
+            self.train,
+            val_size,
         )
 
         return image_paths, captions, lengths, labels

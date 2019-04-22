@@ -142,7 +142,7 @@ def test_get_image_paths_and_corresponding_captions(
     CocoDataset.set_up_class_vars(
         id_to_captions_get_image_paths_and_corresponding_captions.values()
     )
-    image_paths, captions, lengths, labels = CocoDataset.get_img_paths_captions_lengths_wrapper(
+    image_paths, captions, lengths, labels = CocoDataset.get_imgpaths_caps_lens_labs_wrap(
         id_to_filename_true,
         id_to_captions_get_image_paths_and_corresponding_captions,
         min_unk_sub,

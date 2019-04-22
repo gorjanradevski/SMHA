@@ -31,6 +31,7 @@ def train(
     save_model_path: str,
     log_model_path: str,
     recall_at: int,
+    val_size: int,
 ) -> None:
     """Starts a training session.
 
@@ -47,6 +48,7 @@ def train(
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         recall_at: Validate with recall at (input).
+        val_size: How many instances to include in the validation set.
 
     Returns:
         None
@@ -66,8 +68,8 @@ def train(
     val_dataset = CocoDataset(
         val_images_path, val_json_path, hparams.min_unk_sub, train=False
     )
-    val_image_paths, val_captions, val_captions_lengths, val_labels = (
-        val_dataset.get_img_paths_captions_lengths()
+    val_image_paths, val_captions, val_captions_lengths, val_labels = val_dataset.get_img_paths_captions_lengths(
+        val_size
     )
     logger.info("Validation dataset created...")
 
@@ -286,6 +288,12 @@ def parse_args():
     )
     parser.add_argument(
         "--recall_at", type=int, default=5, help="Validate with recall at K (input)."
+    )
+    parser.add_argument(
+        "--val_size",
+        type=int,
+        default=None,
+        help="The size of the validation set. Defaults at the whole set.",
     )
 
     return parser.parse_args()
