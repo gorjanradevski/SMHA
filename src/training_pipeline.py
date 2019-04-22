@@ -166,6 +166,7 @@ def train(
             model.add_summary(sess, val_loss_summary)
 
             if evaluator_val.is_best_loss():
+                evaluator_val.update_best_loss()
                 logger.info("=============================")
                 logger.info(
                     f"Found new best on epoch {e+1} with loss: "
@@ -173,7 +174,6 @@ def train(
                 )
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
-                evaluator_val.update_best_loss()
 
 
 def main():
