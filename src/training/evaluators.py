@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class Evaluator:
-    def __init__(self, num_samples: int, num_features: int):
+    def __init__(self, num_samples: int = 0, num_features: int = 0):
         self.loss = 0.0
         self.best_loss = sys.maxsize
         self.recall_at_k = -1.0
