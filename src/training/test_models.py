@@ -195,9 +195,9 @@ def test_attended_image_text_shape(
         learning_rate,
         clip_value,
     )
-    assert model.attended_image.shape[0] == model.attended_text.shape[0]
-    assert model.attended_image.shape[1] == model.attended_text.shape[1]
-    assert model.attended_image.shape[2] == model.attended_text.shape[2]
+    assert model.attended_images.shape[0] == model.attended_captions.shape[0]
+    assert model.attended_images.shape[1] == model.attended_captions.shape[1]
+    assert model.attended_images.shape[2] == model.attended_captions.shape[2]
 
 
 def test_trainable_image_encoder(input_images, rnn_hidden_size):

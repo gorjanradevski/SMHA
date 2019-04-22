@@ -30,6 +30,7 @@ def train(
     imagenet_checkpoint: bool,
     save_model_path: str,
     log_model_path: str,
+    recall_at: int,
 ) -> None:
     """Starts a training session.
 
@@ -45,7 +46,7 @@ def train(
         imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
-
+        recall_at: Validate with recall at (input).
 
     Returns:
         None
@@ -70,8 +71,13 @@ def train(
     )
     logger.info("Validation dataset created...")
 
-    evaluator_train = Evaluator()
-    evaluator_val = Evaluator()
+    # The number of features at the output will be: rnn_hidden_size * attn_size2
+    evaluator_train = Evaluator(
+        len(train_image_paths), hparams.rnn_hidden_size * hparams.attn_size2
+    )
+    evaluator_val = Evaluator(
+        len(val_image_paths), hparams.rnn_hidden_size * hparams.attn_size2
+    )
 
     logger.info("Evaluators created...")
 
@@ -123,8 +129,8 @@ def train(
 
         for e in range(epochs):
             # Reset evaluators
-            evaluator_train.reset_metrics()
-            evaluator_val.reset_metrics()
+            evaluator_train.reset_all_vars()
+            evaluator_val.reset_all_vars()
 
             # Initialize iterator with training data
             sess.run(loader.train_init)
@@ -152,25 +158,39 @@ def train(
             try:
                 with tqdm(total=len(val_labels)) as pbar:
                     while True:
-                        loss, labels = sess.run([model.loss, model.labels])
+                        loss, labels, embedded_images, embedded_captions = sess.run(
+                            [
+                                model.loss,
+                                model.labels,
+                                model.attended_images,
+                                model.attended_captions,
+                            ]
+                        )
                         evaluator_val.update_metrics(loss)
+                        evaluator_val.update_embeddings(
+                            embedded_images, embedded_captions
+                        )
                         pbar.update(len(labels))
             except tf.errors.OutOfRangeError:
                 pass
 
             # Write validation summaries
-            val_loss_summary = sess.run(
-                model.val_loss_summary,
-                feed_dict={model.val_loss_ph: evaluator_val.loss},
+            val_loss_summary, val_recall_at_k = sess.run(
+                [model.val_loss_summary, model.val_recall_at_k_summary],
+                feed_dict={
+                    model.val_loss_ph: evaluator_val.loss,
+                    model.val_recall_at_k_ph: evaluator_val.best_recall_at_k,
+                },
             )
             model.add_summary(sess, val_loss_summary)
+            model.add_summary(sess, val_recall_at_k)
 
-            if evaluator_val.is_best_loss():
-                evaluator_val.update_best_loss()
+            if evaluator_val.is_best_recall_at_k():
+                evaluator_val.update_best_recall_at_k()
                 logger.info("=============================")
                 logger.info(
-                    f"Found new best on epoch {e+1} with loss: "
-                    f"{evaluator_val.best_loss}! Saving model..."
+                    f"Found new best on epoch {e+1} with recall at {recall_at}: "
+                    f"{evaluator_val.best_recall_at_k}! Saving model..."
                 )
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
@@ -192,6 +212,7 @@ def main():
         args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
+        args.recall_at,
     )
 
 
@@ -264,6 +285,9 @@ def parse_args():
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."
+    )
+    parser.add_argument(
+        "--recall_at", type=int, default=5, help="Validate with recall at K (input)."
     )
 
     return parser.parse_args()
