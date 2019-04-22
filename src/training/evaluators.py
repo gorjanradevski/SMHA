@@ -20,6 +20,8 @@ class Evaluator:
 
     def reset_all_vars(self) -> None:
         self.loss = 0
+        self.recall_at_k = -1.0
+        self.index_update = 0
         self.embedded_images = np.zeros((self.num_samples, self.num_features))
         self.embedded_captions = np.zeros((self.num_samples, self.num_features))
 
