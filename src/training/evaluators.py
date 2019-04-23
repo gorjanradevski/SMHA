@@ -60,14 +60,14 @@ class Evaluator:
     def update_best_recall_at_k(self):
         self.best_recall_at_k = self.recall_at_k
 
-    def image2text_recall_at_k(self, k: int) -> float:
-        """Computes the recall at K.
+    def image2text_recall_at_k(self, k: int) -> None:
+        """Computes the recall at K and updates the object variable.
 
         Args:
             k: Recall at K (this is K).
 
         Returns:
-            Recall at K.
+
 
         """
         num_images = self.embedded_images.shape[0] // 5
@@ -87,4 +87,4 @@ class Evaluator:
                     rank = tmp
             ranks[index] = rank
 
-        return 100.0 * len(np.where(ranks < k)[0]) / len(ranks)
+        self.recall_at_k = 100.0 * len(np.where(ranks < k)[0]) / len(ranks)

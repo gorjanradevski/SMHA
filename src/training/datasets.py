@@ -9,6 +9,8 @@ from utils.constants import PAD_ID, UNK_ID
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# TODO: Refactor into BaseCoco, TrainCoco and ValCoco
+
 
 class CocoDataset:
     # Adapted for working with the Microsoft COCO dataset.

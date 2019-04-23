@@ -16,6 +16,9 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 tf.logging.set_verbosity(tf.logging.ERROR)
 
 # TODO: Experiment name generation method
+# TODO: Inference pipeline
+# TODO: Plot multimodal word embeddings script/notebook
+# TODO: Hyperopt optimize pipeline
 
 
 def train(
@@ -174,12 +177,15 @@ def train(
             except tf.errors.OutOfRangeError:
                 pass
 
+            # Update recall at K
+            evaluator_val.image2text_recall_at_k(recall_at)
+
             # Write validation summaries
             val_loss_summary, val_recall_at_k = sess.run(
                 [model.val_loss_summary, model.val_recall_at_k_summary],
                 feed_dict={
                     model.val_loss_ph: evaluator_val.loss,
-                    model.val_recall_at_k_ph: evaluator_val.best_recall_at_k,
+                    model.val_recall_at_k_ph: evaluator_val.recall_at_k,
                 },
             )
             model.add_summary(sess, val_loss_summary)
