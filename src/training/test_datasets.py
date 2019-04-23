@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from training.datasets import CocoDataset
+from training.datasets import BaseCocoDataset, TrainCocoDataset
 
 
 @pytest.fixture
@@ -38,12 +38,12 @@ def id_to_filename_true():
 
 @pytest.fixture
 def caption():
-    return ".A man +-<      gOeS to BuY>!!!++-= BEER!?@#$%^&"
+    return ".A man +-<      gOeS to BuY>!!!++-= BEER!?@#$%^& BUT BEER or BEER'S"
 
 
 @pytest.fixture
 def caption_true():
-    return ["a", "man", "goes", "to", "buy", "beer"]
+    return ["a", "man", "goes", "to", "buy", "beer", "but", "beer", "or", "beer's"]
 
 
 @pytest.fixture
@@ -98,7 +98,7 @@ def id_to_captions_get_image_paths_and_corresponding_captions():
 
 
 def test_read_json(json_path):
-    json_file = CocoDataset.read_json(json_path)
+    json_file = BaseCocoDataset.read_json(json_path)
     assert "images" in json_file
     assert "annotations" in json_file
     assert type(json_file["images"][0]["id"]) == int
@@ -106,29 +106,29 @@ def test_read_json(json_path):
 
 
 def test_parse_image_paths(json_file, images_path, id_to_filename_true):
-    id_to_filename = CocoDataset.parse_image_paths(json_file, images_path)
+    id_to_filename = BaseCocoDataset.parse_image_paths(json_file, images_path)
     assert id_to_filename == id_to_filename_true
 
 
 def test_preprocess_caption(caption, caption_true):
-    caption_filtered = CocoDataset.preprocess_caption(caption)
+    caption_filtered = BaseCocoDataset.preprocess_caption(caption)
     assert caption_filtered == caption_true
 
 
 def test_parse_captions(json_file, id_to_captions_true):
-    id_to_captions = CocoDataset.parse_captions(json_file)
+    id_to_captions = BaseCocoDataset.parse_captions(json_file)
     assert id_to_captions == id_to_captions_true
 
 
 def test_set_up_class_vars(id_to_captions_true):
-    CocoDataset.set_up_class_vars(id_to_captions_true.values())
-    assert len(CocoDataset.word2index) == 8
-    assert len(CocoDataset.index2word) == 8
-    assert sum(CocoDataset.index2word.keys()) == sum(range(8))
+    BaseCocoDataset.set_up_class_vars(id_to_captions_true.values())
+    assert len(BaseCocoDataset.word2index) == 8
+    assert len(BaseCocoDataset.index2word) == 8
+    assert sum(BaseCocoDataset.index2word.keys()) == sum(range(8))
 
 
-def test_dataset_object_creation(images_path, json_path, min_unk_sub, train):
-    dataset = CocoDataset(images_path, json_path, min_unk_sub, train)
+def test_dataset_object_creation(images_path, json_path, min_unk_sub):
+    dataset = TrainCocoDataset(images_path, json_path, min_unk_sub)
     assert len(dataset.id_to_filename.keys()) == 3
     assert len(dataset.id_to_captions.keys()) == 3
 
@@ -137,16 +137,14 @@ def test_get_image_paths_and_corresponding_captions(
     id_to_filename_true,
     id_to_captions_get_image_paths_and_corresponding_captions,
     min_unk_sub,
-    train,
 ):
-    CocoDataset.set_up_class_vars(
+    BaseCocoDataset.set_up_class_vars(
         id_to_captions_get_image_paths_and_corresponding_captions.values()
     )
-    image_paths, captions, lengths, labels = CocoDataset.get_imgpaths_caps_lens_labs_wrap(
+    image_paths, captions, lengths, labels = TrainCocoDataset.get_imgpaths_caps_lens_labs_wrap(
         id_to_filename_true,
         id_to_captions_get_image_paths_and_corresponding_captions,
         min_unk_sub,
-        train,
     )
     assert len(image_paths) == 15
     assert len(captions) == 15

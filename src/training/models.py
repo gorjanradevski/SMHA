@@ -82,7 +82,9 @@ class Text2ImageMatchingModel:
             self.loss, optimizer_type, learning_rate, clip_value
         )
         # Imagenet graph loader and graph saver/loader
-        self.image_encoder_loader = self.create_image_encoder_loader()
+        self.image_encoder_loader = tf.train.Saver(
+            tf.trainable_variables(scope="vgg_16")
+        )
         self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")
 
@@ -109,23 +111,23 @@ class Text2ImageMatchingModel:
                 outputs_collections=end_points_collection,
             ):
                 net = layers_lib.repeat(
-                    images, 2, layers.conv2d, 64, [3, 3], scope="conv1", trainable=False
+                    images, 2, layers.conv2d, 64, [3, 3], scope="conv1"
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool1")
                 net = layers_lib.repeat(
-                    net, 2, layers.conv2d, 128, [3, 3], scope="conv2", trainable=False
+                    net, 2, layers.conv2d, 128, [3, 3], scope="conv2"
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool2")
                 net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 256, [3, 3], scope="conv3", trainable=False
+                    net, 3, layers.conv2d, 256, [3, 3], scope="conv3"
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool3")
                 net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 512, [3, 3], scope="conv4", trainable=False
+                    net, 3, layers.conv2d, 512, [3, 3], scope="conv4"
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool4")
                 net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 512, [3, 3], scope="conv5", trainable=False
+                    net, 3, layers.conv2d, 512, [3, 3], scope="conv5"
                 )
                 image_feature_extractor = layers_lib.max_pool2d(
                     net, [2, 2], scope="pool5"
@@ -368,20 +370,6 @@ class Text2ImageMatchingModel:
         return optimizer.apply_gradients(
             zip(gradients, variables), global_step=self.global_step
         )
-
-    @staticmethod
-    def create_image_encoder_loader():
-        """Creates a loader that can be used to load the image encoder.
-
-        Returns:
-            A use-case specific loader.
-
-        """
-        variables_to_restore = tf.contrib.framework.get_variables_to_restore(
-            include=["vgg_16"]
-        )
-
-        return tf.train.Saver(variables_to_restore)
 
     def init(
         self, sess: tf.Session, checkpoint_path: str, imagenet_checkpoint: bool

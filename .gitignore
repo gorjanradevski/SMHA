@@ -1,8 +1,8 @@
 /.DS_Store
 /models
-/data/annotations/
-/data/train2014/
-/data/val2014/
+/data/MicrosoftCoco_dataset/
+/data/Flickr30k_dataset/
+/data/Flickr8k_dataset/
 /notebooks
 /logs
 /.idea

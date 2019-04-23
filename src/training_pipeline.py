@@ -4,7 +4,7 @@ import logging
 from tqdm import tqdm
 import os
 
-from training.datasets import CocoDataset
+from training.datasets import TrainCocoDataset, ValCocoDataset
 from training.hyperparameters import YParams
 from training.loaders import CocoTrainValLoader
 from training.models import Text2ImageMatchingModel
@@ -58,21 +58,17 @@ def train(
 
     """
     hparams = YParams(hparams_path)
-    train_dataset = CocoDataset(
-        train_images_path, train_json_path, hparams.min_unk_sub, train=True
+    train_dataset = TrainCocoDataset(
+        train_images_path, train_json_path, hparams.min_unk_sub
     )
     train_image_paths, train_captions, train_captions_lengths, train_labels = (
         train_dataset.get_img_paths_captions_lengths()
     )
     # Getting the vocabulary size of the train dataset
-    vocab_size = CocoDataset.get_vocab_size()
-
     logger.info("Train dataset created...")
-    val_dataset = CocoDataset(
-        val_images_path, val_json_path, hparams.min_unk_sub, train=False
-    )
-    val_image_paths, val_captions, val_captions_lengths, val_labels = val_dataset.get_img_paths_captions_lengths(
-        val_size
+    val_dataset = ValCocoDataset(val_images_path, val_json_path, val_size)
+    val_image_paths, val_captions, val_captions_lengths, val_labels = (
+        val_dataset.get_img_paths_captions_lengths()
     )
     logger.info("Validation dataset created...")
 
@@ -110,7 +106,7 @@ def train(
         labels,
         hparams.margin,
         hparams.rnn_hidden_size,
-        vocab_size,
+        TrainCocoDataset.get_vocab_size(),
         hparams.embed_size,
         hparams.cell,
         hparams.layers,
@@ -240,25 +236,25 @@ def parse_args():
     parser.add_argument(
         "--train_images_path",
         type=str,
-        default="data/train2014/",
+        default="data/MicrosoftCoco_dataset/train2014/",
         help="Path where the train images are.",
     )
     parser.add_argument(
         "--train_json_path",
         type=str,
-        default="data/annotations/captions_train2014.json",
+        default="data/MicrosoftCoco_dataset/annotations/captions_train2014.json",
         help="Path where the train json file with the captions and image ids.",
     )
     parser.add_argument(
         "--val_images_path",
         type=str,
-        default="data/val2014/",
+        default="data/MicrosoftCoco_dataset/val2014/",
         help="Path where the validation images are.",
     )
     parser.add_argument(
         "--val_json_path",
         type=str,
-        default="data/annotations/captions_val2014.json",
+        default="data/MicrosoftCoco_dataset/annotations/captions_val2014.json",
         help="Path where the val json file with the captions and image ids.",
     )
     parser.add_argument(
