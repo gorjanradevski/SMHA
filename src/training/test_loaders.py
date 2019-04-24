@@ -65,6 +65,11 @@ def batch_size():
     return 2
 
 
+@pytest.fixture
+def prefetch_size():
+    return 2
+
+
 def test_loader(
     train_image_paths,
     train_captions,
@@ -76,6 +81,7 @@ def test_loader(
     val_labels,
     epochs,
     batch_size,
+    prefetch_size,
 ):
     tf.reset_default_graph()
     loader = TrainValLoader(
@@ -88,6 +94,7 @@ def test_loader(
         val_captions_lengths,
         val_labels,
         batch_size,
+        prefetch_size,
     )
     images, captions, captions_lengths, labels = loader.get_next()
     with tf.Session() as sess:

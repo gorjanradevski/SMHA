@@ -29,6 +29,7 @@ def train(
     val_imgs_file_path,
     epochs: int,
     batch_size: int,
+    prefetch_size: int,
     checkpoint_path: str,
     imagenet_checkpoint: bool,
     save_model_path: str,
@@ -89,6 +90,7 @@ def train(
         val_captions_lengths,
         val_labels,
         batch_size,
+        prefetch_size,
     )
     images, captions, captions_lengths, labels = loader.get_next()
     logger.info("Loader created...")
@@ -205,6 +207,7 @@ def main():
         args.val_imgs_file_path,
         args.epochs,
         args.batch_size,
+        args.prefetch_size,
         args.checkpoint_path,
         args.imagenet_checkpoint,
         args.save_model_path,
@@ -282,6 +285,9 @@ def parse_args():
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."
+    )
+    parser.add_argument(
+        "--prefetch_size", type=int, default=5, help="The size of prefetch on gpu."
     )
     parser.add_argument(
         "--recall_at", type=int, default=5, help="Validate with recall at K (input)."

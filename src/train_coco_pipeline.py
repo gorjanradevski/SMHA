@@ -29,6 +29,7 @@ def train(
     val_json_path: str,
     epochs: int,
     batch_size: int,
+    prefetch_size: int,
     checkpoint_path: str,
     imagenet_checkpoint: bool,
     save_model_path: str,
@@ -45,6 +46,7 @@ def train(
         val_json_path: The path to the validation annotations.
         epochs: The number of epochs to train the model.
         batch_size: The batch size to be used.
+        prefetch_size: The size of the prefetch on gpu.
         checkpoint_path: Path to a valid model checkpoint.
         imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
@@ -92,6 +94,7 @@ def train(
         val_captions_lengths,
         val_labels,
         batch_size,
+        prefetch_size,
     )
     images, captions, captions_lengths, labels = loader.get_next()
     logger.info("Loader created...")
@@ -208,6 +211,7 @@ def main():
         args.val_json_path,
         args.epochs,
         args.batch_size,
+        args.prefetch_size,
         args.checkpoint_path,
         args.imagenet_checkpoint,
         args.save_model_path,
@@ -285,6 +289,9 @@ def parse_args():
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."
+    )
+    parser.add_argument(
+        "--prefetch_size", type=int, default=5, help="The size of prefetch on gpu."
     )
     parser.add_argument(
         "--recall_at", type=int, default=5, help="Validate with recall at K (input)."

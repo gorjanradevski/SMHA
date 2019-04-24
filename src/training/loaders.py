@@ -21,6 +21,7 @@ class TrainValLoader:
         val_captions_lengths: List[List[int]],
         val_labels: List[List[int]],
         batch_size: int,
+        prefetch_size: int,
     ):
         # Build training dataset
         self.train_image_paths = train_image_paths
@@ -42,7 +43,7 @@ class TrainValLoader:
             batch_size,
             padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
         )
-        self.train_dataset = self.train_dataset.prefetch(1)
+        self.train_dataset = self.train_dataset.prefetch(prefetch_size)
         logger.info("Training dataset created...")
 
         # Build validation dataset
@@ -62,7 +63,7 @@ class TrainValLoader:
             batch_size,
             padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
         )
-        self.val_dataset = self.val_dataset.prefetch(1)
+        self.val_dataset = self.val_dataset.prefetch(prefetch_size)
         logger.info("Validation dataset created...")
 
         self.iterator = tf.data.Iterator.from_structure(
