@@ -96,11 +96,6 @@ def clip_value():
     return 0.0
 
 
-@pytest.fixture
-def train_image_encoder():
-    return False
-
-
 def test_image_encoder(input_images, rnn_hidden_size):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[3, 224, 224, 3])
@@ -199,19 +194,8 @@ def test_attended_image_text_shape(
         optimizer_type,
         learning_rate,
         clip_value,
+        "",
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]
     assert model.attended_images.shape[2] == model.attended_captions.shape[2]
-
-
-def test_trainable_image_encoder(input_images, rnn_hidden_size, train_image_encoder):
-    # Tests if the variables of the image encoder aren't trainable
-    tf.reset_default_graph()
-    input_layer = tf.placeholder(dtype=tf.float32, shape=[3, 224, 224, 3])
-    _ = Text2ImageMatchingModel.image_encoder_graph(
-        input_layer, rnn_hidden_size, train_image_encoder
-    )
-    trainable_vars = tf.trainable_variables()
-    for variable in trainable_vars:
-        assert "project_image" in variable.name

@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from training.datasets import BaseCocoDataset, TrainCocoDataset
+from training.datasets import BaseCocoDataset, TrainCocoDataset, preprocess_caption
 
 
 @pytest.fixture
@@ -111,7 +111,7 @@ def test_parse_image_paths(json_file, images_path, id_to_filename_true):
 
 
 def test_preprocess_caption(caption, caption_true):
-    caption_filtered = BaseCocoDataset.preprocess_caption(caption)
+    caption_filtered = preprocess_caption(caption)
     assert caption_filtered == caption_true
 
 
@@ -120,8 +120,8 @@ def test_parse_captions(json_file, id_to_captions_true):
     assert id_to_captions == id_to_captions_true
 
 
-def test_set_up_class_vars(id_to_captions_true):
-    BaseCocoDataset.set_up_class_vars(id_to_captions_true.values())
+def test_set_up_class_vars(id_to_captions_true, min_unk_sub):
+    BaseCocoDataset.set_up_class_vars(id_to_captions_true.values(), 0)
     assert len(BaseCocoDataset.word2index) == 8
     assert len(BaseCocoDataset.index2word) == 8
     assert sum(BaseCocoDataset.index2word.keys()) == sum(range(8))
@@ -139,12 +139,10 @@ def test_get_image_paths_and_corresponding_captions(
     min_unk_sub,
 ):
     BaseCocoDataset.set_up_class_vars(
-        id_to_captions_get_image_paths_and_corresponding_captions.values()
+        id_to_captions_get_image_paths_and_corresponding_captions.values(), min_unk_sub
     )
-    image_paths, captions, lengths, labels = TrainCocoDataset.get_imgpaths_caps_lens_labs_wrap(
-        id_to_filename_true,
-        id_to_captions_get_image_paths_and_corresponding_captions,
-        min_unk_sub,
+    image_paths, captions, lengths, labels = TrainCocoDataset.get_data_wrapper(
+        id_to_filename_true, id_to_captions_get_image_paths_and_corresponding_captions
     )
     assert len(image_paths) == 15
     assert len(captions) == 15

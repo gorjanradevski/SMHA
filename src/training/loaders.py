@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class CocoTrainValLoader:
+class TrainValLoader:
     def __init__(
         self,
         train_image_paths: List[str],

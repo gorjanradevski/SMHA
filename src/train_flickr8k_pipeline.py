@@ -4,9 +4,9 @@ import logging
 from tqdm import tqdm
 import os
 
-from training.datasets import TrainCocoDataset, ValCocoDataset
+from training.datasets import Flickr8kDataset, get_vocab_size
 from training.hyperparameters import YParams
-from training.loaders import CocoTrainValLoader
+from training.loaders import TrainValLoader
 from training.models import Text2ImageMatchingModel
 from training.evaluators import Evaluator
 
@@ -23,10 +23,10 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 
 def train(
     hparams_path: str,
-    train_images_path: str,
-    train_json_path: str,
-    val_images_path: str,
-    val_json_path: str,
+    images_path: str,
+    texts_path: str,
+    train_imgs_file_path: str,
+    val_imgs_file_path,
     epochs: int,
     batch_size: int,
     checkpoint_path: str,
@@ -34,16 +34,15 @@ def train(
     save_model_path: str,
     log_model_path: str,
     recall_at: int,
-    val_size: int,
 ) -> None:
-    """Starts a training session.
+    """Starts a training session with the Flickr8k dataset.
 
     Args:
         hparams_path: The path to the hyperparameters yaml file.
-        train_images_path: The path to the training images.
-        train_json_path: The path to the training annotations.
-        val_images_path: The path to the validation images.
-        val_json_path: The path to the validation annotations.
+        images_path: A path where all the images are located.
+        texts_path: Path where the text doc with the descriptions is.
+        train_imgs_file_path: Path to a file with the train image names.
+        val_imgs_file_path: Path to a file with the val image names.
         epochs: The number of epochs to train the model.
         batch_size: The batch size to be used.
         checkpoint_path: Path to a valid model checkpoint.
@@ -51,25 +50,21 @@ def train(
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         recall_at: Validate with recall at (input).
-        val_size: How many instances to include in the validation set.
 
     Returns:
         None
 
     """
     hparams = YParams(hparams_path)
-    train_dataset = TrainCocoDataset(
-        train_images_path, train_json_path, hparams.min_unk_sub
-    )
-    train_image_paths, train_captions, train_captions_lengths, train_labels = (
-        train_dataset.get_img_paths_captions_lengths()
+    dataset = Flickr8kDataset(images_path, texts_path, hparams.min_unk_sub)
+    train_image_paths, train_captions, train_captions_lengths, train_labels = dataset.get_data(
+        train_imgs_file_path
     )
     # Getting the vocabulary size of the train dataset
-    logger.info("Train dataset created...")
-    val_dataset = ValCocoDataset(val_images_path, val_json_path, val_size)
-    val_image_paths, val_captions, val_captions_lengths, val_labels = (
-        val_dataset.get_img_paths_captions_lengths()
+    val_image_paths, val_captions, val_captions_lengths, val_labels = dataset.get_data(
+        val_imgs_file_path
     )
+    logger.info("Train dataset created...")
     logger.info("Validation dataset created...")
 
     evaluator_train = Evaluator()
@@ -84,7 +79,7 @@ def train(
     tf.reset_default_graph()
     tf.set_random_seed(hparams.seed)
 
-    loader = CocoTrainValLoader(
+    loader = TrainValLoader(
         train_image_paths,
         train_captions,
         train_captions_lengths,
@@ -106,7 +101,7 @@ def train(
         labels,
         hparams.margin,
         hparams.rnn_hidden_size,
-        TrainCocoDataset.get_vocab_size(),
+        get_vocab_size(Flickr8kDataset),
         hparams.embed_size,
         hparams.cell,
         hparams.layers,
@@ -204,10 +199,10 @@ def main():
     args = parse_args()
     train(
         args.hparams_path,
-        args.train_images_path,
-        args.train_json_path,
-        args.val_images_path,
-        args.val_json_path,
+        args.images_path,
+        args.texts_path,
+        args.train_imgs_file_path,
+        args.val_imgs_file_path,
         args.epochs,
         args.batch_size,
         args.checkpoint_path,
@@ -215,7 +210,6 @@ def main():
         args.save_model_path,
         args.log_model_path,
         args.recall_at,
-        args.val_size,
     )
 
 
@@ -234,28 +228,28 @@ def parse_args():
         help="Path to an hyperparameters yaml file.",
     )
     parser.add_argument(
-        "--train_images_path",
+        "--images_path",
         type=str,
-        default="data/MicrosoftCoco_dataset/train2014/",
-        help="Path where the train images are.",
+        default="data/Flickr8k_dataset/Flicker8k_Dataset",
+        help="Path where all images are.",
     )
     parser.add_argument(
-        "--train_json_path",
+        "--texts_path",
         type=str,
-        default="data/MicrosoftCoco_dataset/annotations/captions_train2014.json",
-        help="Path where the train json file with the captions and image ids.",
+        default="data/Flickr8k_dataset/Flickr8k_text/Flickr8k.token.txt",
+        help="Path to the file where the image to caption mappings are.",
     )
     parser.add_argument(
-        "--val_images_path",
+        "--train_imgs_file_path",
         type=str,
-        default="data/MicrosoftCoco_dataset/val2014/",
-        help="Path where the validation images are.",
+        default="data/Flickr8k_dataset/Flickr8k_text/Flickr_8k.trainImages.txt",
+        help="Path to the file where the train images names are included.",
     )
     parser.add_argument(
-        "--val_json_path",
+        "--val_imgs_file_path",
         type=str,
-        default="data/MicrosoftCoco_dataset/annotations/captions_val2014.json",
-        help="Path where the val json file with the captions and image ids.",
+        default="data/Flickr8k_dataset/Flickr8k_text/Flickr_8k.devImages.txt",
+        help="Path to the file where the train images names are included.",
     )
     parser.add_argument(
         "--checkpoint_path",
@@ -291,12 +285,6 @@ def parse_args():
     )
     parser.add_argument(
         "--recall_at", type=int, default=5, help="Validate with recall at K (input)."
-    )
-    parser.add_argument(
-        "--val_size",
-        type=int,
-        default=None,
-        help="The size of the validation set. Defaults at the whole set.",
     )
 
     return parser.parse_args()

@@ -34,7 +34,7 @@ class Text2ImageMatchingModel:
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
-        log_dir: str = None,
+        log_dir: str,
     ):
         # Get images, captions, lengths and labels
         self.images = images

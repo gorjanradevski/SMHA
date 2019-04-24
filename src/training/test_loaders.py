@@ -2,7 +2,7 @@ import pytest
 import tensorflow as tf
 import numpy as np
 
-from training.loaders import CocoTrainValLoader
+from training.loaders import TrainValLoader
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ def test_loader(
     batch_size,
 ):
     tf.reset_default_graph()
-    loader = CocoTrainValLoader(
+    loader = TrainValLoader(
         train_image_paths,
         train_captions,
         train_captions_lengths,
