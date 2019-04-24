@@ -87,4 +87,4 @@ class Evaluator:
                     rank = tmp
             ranks[index] = rank
 
-        self.recall_at_k = 100.0 * len(np.where(ranks < k)[0]) / len(ranks)
+        self.recall_at_k = len(np.where(ranks < k)[0]) / len(ranks)

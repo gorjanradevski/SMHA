@@ -141,13 +141,12 @@ def test_get_image_paths_and_corresponding_captions(
     BaseCocoDataset.set_up_class_vars(
         id_to_captions_get_image_paths_and_corresponding_captions.values(), min_unk_sub
     )
-    image_paths, captions, lengths, labels = TrainCocoDataset.get_data_wrapper(
+    image_paths, captions, lengths = TrainCocoDataset.get_data_wrapper(
         id_to_filename_true, id_to_captions_get_image_paths_and_corresponding_captions
     )
     assert len(image_paths) == 15
     assert len(captions) == 15
     assert len(lengths) == 15
-    assert len(labels) == 15
     for caption in captions:
         assert len(caption) == 2
     for length in lengths:

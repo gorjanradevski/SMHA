@@ -172,7 +172,7 @@ class BaseCocoDataset(ABC):
     @staticmethod
     def get_data_wrapper(
         id_to_filename: Dict[int, str], id_to_captions: Dict[int, List[List[str]]]
-    ) -> Tuple[List[str], List[List[int]], List[List[int]], List[List[int]]]:
+    ) -> Tuple[List[str], List[List[int]], List[List[int]]]:
         """Returns the image paths and captions.
 
         Because in the dataset there are 5 captions for each image, what the method does
@@ -194,39 +194,33 @@ class BaseCocoDataset(ABC):
         image_paths = []
         captions = []
         lengths = []
-        labels = []
-        label = 0
         for pair_id in id_to_filename.keys():
             for i in range(5):
                 image_paths.append(id_to_filename[pair_id])
-                # Append the same label for each image and the 5 sentences
                 # Must wrap with a list so that the rank will be the same as the
                 # captions
-                labels.append([label])
                 indexed_caption = [
                     BaseCocoDataset.word2index[word]
                     if word in BaseCocoDataset.word2index.keys()
-                    else 0
+                    else 1
                     for word in id_to_captions[pair_id][i]
                 ]
                 captions.append(indexed_caption)
                 # Must wrap with a list so that the rank will be the same as the
                 # captions
                 lengths.append([len(indexed_caption)])
-            # Increase the label for the next pair
-            label += 1
 
         assert len(image_paths) == len(captions)
-        assert len(image_paths) == len(labels)
+        assert len(image_paths) == len(lengths)
 
-        return image_paths, captions, lengths, labels
+        return image_paths, captions, lengths
 
     def get_data(self):
-        image_paths, captions, lengths, labels = self.get_data_wrapper(
+        image_paths, captions, lengths = self.get_data_wrapper(
             self.id_to_filename, self.id_to_captions
         )
 
-        return image_paths, captions, lengths, labels
+        return image_paths, captions, lengths
 
 
 class TrainCocoDataset(BaseCocoDataset):
@@ -361,14 +355,12 @@ class Flickr8kDataset:
             images_dir_path: A path where all the images are located.
 
         Returns:
-            Image paths, captions, lengths and labels.
+            Image paths, captions and lengths.
 
         """
         image_paths = []
         captions = []
         lengths = []
-        labels = []
-        label = 0
         with open(imgs_file_path, "r") as file:
             for image_name in file:
                 # Remove the newline character at the end
@@ -378,28 +370,25 @@ class Flickr8kDataset:
                     # Append the same label for each image and the 5 sentences
                     # Must wrap with a list so that the rank will be the same as the
                     # captions
-                    labels.append([label])
                     indexed_caption = [
                         Flickr8kDataset.word2index[word]
                         if word in Flickr8kDataset.word2index.keys()
-                        else 0
+                        else 1
                         for word in img_path_caption[image_name][i]
                     ]
                     captions.append(indexed_caption)
                     # Must wrap with a list so that the rank will be the same as the
                     # captions
                     lengths.append([len(indexed_caption)])
-                # Increase the label for the next pair
-                label += 1
 
         assert len(image_paths) == len(captions)
-        assert len(image_paths) == len(labels)
+        assert len(image_paths) == len(lengths)
 
-        return image_paths, captions, lengths, labels
+        return image_paths, captions, lengths
 
     def get_data(self, images_file_path: str):
-        image_paths, captions, lengths, labels = self.get_data_wrapper(
+        image_paths, captions, lengths = self.get_data_wrapper(
             images_file_path, self.img_path_caption, self.images_path
         )
 
-        return image_paths, captions, lengths, labels
+        return image_paths, captions, lengths

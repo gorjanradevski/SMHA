@@ -15,11 +15,9 @@ class TrainValLoader:
         train_image_paths: List[str],
         train_captions: List[List[int]],
         train_captions_lengths: List[List[int]],
-        train_labels: List[List[int]],
         val_image_paths: List[str],
         val_captions: List[List[int]],
         val_captions_lengths: List[List[int]],
-        val_labels: List[List[int]],
         batch_size: int,
         prefetch_size: int,
     ):
@@ -27,11 +25,10 @@ class TrainValLoader:
         self.train_image_paths = train_image_paths
         self.train_captions = train_captions
         self.train_captions_lengths = train_captions_lengths
-        self.train_labels = train_labels
         self.train_dataset = tf.data.Dataset.from_generator(
             generator=self.train_data_generator,
-            output_types=(tf.string, tf.int32, tf.int32, tf.int32),
-            output_shapes=(None, None, None, None),
+            output_types=(tf.string, tf.int32, tf.int32),
+            output_shapes=(None, None, None),
         )
         self.train_dataset = self.train_dataset.shuffle(
             buffer_size=len(self.train_image_paths)
@@ -40,8 +37,7 @@ class TrainValLoader:
             self.parse_data_train, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.train_dataset = self.train_dataset.padded_batch(
-            batch_size,
-            padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
+            batch_size, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
         self.train_dataset = self.train_dataset.prefetch(prefetch_size)
         logger.info("Training dataset created...")
@@ -50,18 +46,16 @@ class TrainValLoader:
         self.val_image_paths = val_image_paths
         self.val_captions = val_captions
         self.val_captions_lengths = val_captions_lengths
-        self.val_labels = val_labels
         self.val_dataset = tf.data.Dataset.from_generator(
             generator=self.val_data_generator,
-            output_types=(tf.string, tf.int32, tf.int32, tf.int32),
-            output_shapes=(None, None, None, None),
+            output_types=(tf.string, tf.int32, tf.int32),
+            output_shapes=(None, None, None),
         )
         self.val_dataset = self.val_dataset.map(
             self.parse_data_val, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.val_dataset = self.val_dataset.padded_batch(
-            batch_size,
-            padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
+            batch_size, padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None])
         )
         self.val_dataset = self.val_dataset.prefetch(prefetch_size)
         logger.info("Validation dataset created...")
@@ -78,8 +72,8 @@ class TrainValLoader:
 
     @staticmethod
     def parse_data_train(
-        image_path: str, caption: tf.Tensor, caption_len: tf.Tensor, label: tf.Tensor
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        image_path: str, caption: tf.Tensor, caption_len: tf.Tensor
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         # Parse image
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
@@ -90,12 +84,10 @@ class TrainValLoader:
         means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
         image = image - means
 
-        return image, caption, caption_len, label
+        return image, caption, caption_len
 
     @staticmethod
-    def parse_data_val(
-        image_path: str, caption: tf.Tensor, caption_len: tf.Tensor, label: tf.Tensor
-    ):
+    def parse_data_val(image_path: str, caption: tf.Tensor, caption_len: tf.Tensor):
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
         image = tf.image.convert_image_dtype(image, tf.float32)
@@ -104,31 +96,24 @@ class TrainValLoader:
         means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
         image = image - means
 
-        return image, caption, caption_len, label
+        return image, caption, caption_len
 
     def train_data_generator(self) -> Generator[tf.Tensor, None, None]:
-        for image_path, caption, caption_len, label in zip(
-            self.train_image_paths,
-            self.train_captions,
-            self.train_captions_lengths,
-            self.train_labels,
+        for image_path, caption, caption_len in zip(
+            self.train_image_paths, self.train_captions, self.train_captions_lengths
         ):
-            yield image_path, caption, caption_len, label
+            yield image_path, caption, caption_len
 
     def val_data_generator(self) -> Generator[tf.Tensor, None, None]:
-        for image_path, caption, caption_len, label in zip(
-            self.val_image_paths,
-            self.val_captions,
-            self.val_captions_lengths,
-            self.val_labels,
+        for image_path, caption, caption_len in zip(
+            self.val_image_paths, self.val_captions, self.val_captions_lengths
         ):
-            yield image_path, caption, caption_len, label
+            yield image_path, caption, caption_len
 
-    def get_next(self) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        images, captions, captions_lengths, labels = self.iterator.get_next()
-        # Squeeze the redundant dimension of captions_lengths and labels because they
-        # were added just so the padded_batch function will work
+    def get_next(self) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        images, captions, captions_lengths = self.iterator.get_next()
+        # Squeeze the redundant dimension of captions_lengths because they were added
+        # just so the padded_batch function will work
         captions_lengths = tf.squeeze(captions_lengths, axis=1)
-        labels = tf.squeeze(labels, axis=1)
 
-        return images, captions, captions_lengths, labels
+        return images, captions, captions_lengths

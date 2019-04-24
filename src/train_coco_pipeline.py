@@ -61,15 +61,11 @@ def train(
     train_dataset = TrainCocoDataset(
         train_images_path, train_json_path, hparams.min_unk_sub
     )
-    train_image_paths, train_captions, train_captions_lengths, train_labels = (
-        train_dataset.get_data()
-    )
+    train_image_paths, train_captions, train_captions_lengths = train_dataset.get_data()
     # Getting the vocabulary size of the train dataset
     logger.info("Train dataset created...")
     val_dataset = ValCocoDataset(val_images_path, val_json_path)
-    val_image_paths, val_captions, val_captions_lengths, val_labels = (
-        val_dataset.get_data()
-    )
+    val_image_paths, val_captions, val_captions_lengths = val_dataset.get_data()
     logger.info("Validation dataset created...")
 
     evaluator_train = Evaluator()
@@ -88,15 +84,13 @@ def train(
         train_image_paths,
         train_captions,
         train_captions_lengths,
-        train_labels,
         val_image_paths,
         val_captions,
         val_captions_lengths,
-        val_labels,
         batch_size,
         prefetch_size,
     )
-    images, captions, captions_lengths, labels = loader.get_next()
+    images, captions, captions_lengths = loader.get_next()
     logger.info("Loader created...")
 
     model = Text2ImageMatchingModel(
@@ -104,7 +98,6 @@ def train(
         images,
         captions,
         captions_lengths,
-        labels,
         hparams.margin,
         hparams.rnn_hidden_size,
         get_vocab_size(TrainCocoDataset),
@@ -135,13 +128,13 @@ def train(
             # Initialize iterator with training data
             sess.run(loader.train_init)
             try:
-                with tqdm(total=len(train_labels)) as pbar:
+                with tqdm(total=len(train_image_paths)) as pbar:
                     while True:
-                        _, loss, labels = sess.run(
-                            [model.optimize, model.loss, model.labels]
+                        _, loss, lengths = sess.run(
+                            [model.optimize, model.loss, model.captions_len]
                         )
                         evaluator_train.update_metrics(loss)
-                        pbar.update(len(labels))
+                        pbar.update(len(lengths))
                         pbar.set_postfix({"Batch loss": loss})
             except tf.errors.OutOfRangeError:
                 pass
@@ -156,12 +149,12 @@ def train(
             # Initialize iterator with validation data
             sess.run(loader.val_init)
             try:
-                with tqdm(total=len(val_labels)) as pbar:
+                with tqdm(total=len(val_image_paths)) as pbar:
                     while True:
-                        loss, labels, embedded_images, embedded_captions = sess.run(
+                        loss, lengths, embedded_images, embedded_captions = sess.run(
                             [
                                 model.loss,
-                                model.labels,
+                                model.captions_len,
                                 model.attended_images,
                                 model.attended_captions,
                             ]
@@ -170,7 +163,7 @@ def train(
                         evaluator_val.update_embeddings(
                             embedded_images, embedded_captions
                         )
-                        pbar.update(len(labels))
+                        pbar.update(len(lengths))
             except tf.errors.OutOfRangeError:
                 pass
 
