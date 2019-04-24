@@ -42,7 +42,7 @@ class TrainValLoader:
             batch_size,
             padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
         )
-        self.train_dataset = self.train_dataset.prefetch(5)
+        self.train_dataset = self.train_dataset.prefetch(2)
         logger.info("Training dataset created...")
 
         # Build validation dataset
@@ -62,7 +62,7 @@ class TrainValLoader:
             batch_size,
             padded_shapes=([WIDTH, HEIGHT, NUM_CHANNELS], [None], [None], [None]),
         )
-        self.val_dataset = self.val_dataset.prefetch(5)
+        self.val_dataset = self.val_dataset.prefetch(2)
         logger.info("Validation dataset created...")
 
         self.iterator = tf.data.Iterator.from_structure(
