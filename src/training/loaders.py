@@ -34,6 +34,9 @@ class TrainValLoader:
             buffer_size=len(self.train_image_paths)
         )
         self.train_dataset = self.train_dataset.map(
+            self.parse_data, num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
+        self.train_dataset = self.train_dataset.map(
             self.parse_data_train, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.train_dataset = self.train_dataset.padded_batch(
@@ -50,6 +53,9 @@ class TrainValLoader:
             generator=self.val_data_generator,
             output_types=(tf.string, tf.int32, tf.int32),
             output_shapes=(None, None, None),
+        )
+        self.val_dataset = self.val_dataset.map(
+            self.parse_data, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.val_dataset = self.val_dataset.map(
             self.parse_data_val, num_parallel_calls=tf.data.experimental.AUTOTUNE
@@ -71,28 +77,43 @@ class TrainValLoader:
         logger.info("Iterator created...")
 
     @staticmethod
-    def parse_data_train(
+    def parse_data(
         image_path: str, caption: tf.Tensor, caption_len: tf.Tensor
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        # Parse image
+        # Adapted: https://gist.github.com/omoindrot/dedc857cdc0e680dfb1be99762990c9c
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
         image = tf.cast(image, tf.float32)
+        smallest_side = 256.0  # Max for VGG16
+        height, width = tf.shape(image)[0], tf.shape(image)[1]
+        height = tf.to_float(height)
+        width = tf.to_float(width)
+
+        scale = tf.cond(
+            tf.greater(height, width),
+            lambda: smallest_side / width,
+            lambda: smallest_side / height,
+        )
+        new_height = tf.to_int32(height * scale)
+        new_width = tf.to_int32(width * scale)
+        image = tf.image.resize_images(image, [new_height, new_width])
+
+        return image, caption, caption_len
+
+    @staticmethod
+    def parse_data_train(
+        image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         image = tf.random_crop(image, [WIDTH, HEIGHT, NUM_CHANNELS])
         image = tf.image.random_flip_left_right(image)
-
         means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
         image = image - means
 
         return image, caption, caption_len
 
     @staticmethod
-    def parse_data_val(image_path: str, caption: tf.Tensor, caption_len: tf.Tensor):
-        image_string = tf.read_file(image_path)
-        image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
-        image = tf.cast(image, tf.float32)
+    def parse_data_val(image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor):
         image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
-
         means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
         image = image - means
 
