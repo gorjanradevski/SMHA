@@ -77,8 +77,8 @@ class TrainValLoader:
         # Parse image
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
-        image = tf.image.convert_image_dtype(image, tf.float32)
-        image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
+        image = tf.cast(image, tf.float32)
+        image = tf.random_crop(image, [WIDTH, HEIGHT, NUM_CHANNELS])
         image = tf.image.random_flip_left_right(image)
 
         means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
@@ -90,7 +90,7 @@ class TrainValLoader:
     def parse_data_val(image_path: str, caption: tf.Tensor, caption_len: tf.Tensor):
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
-        image = tf.image.convert_image_dtype(image, tf.float32)
+        image = tf.cast(image, tf.float32)
         image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
 
         means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
