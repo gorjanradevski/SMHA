@@ -69,10 +69,8 @@ def train(
     logger.info("Validation dataset created...")
 
     evaluator_train = Evaluator()
-    # The number of features at the output will be: rnn_hidden_size * attn_size2 * 2
-    evaluator_val = Evaluator(
-        len(val_image_paths), hparams.rnn_hidden_size * hparams.attn_size2 * 2
-    )
+    # The number of features at the output will be: rnn_hidden_size * 2
+    evaluator_val = Evaluator(len(val_image_paths), hparams.rnn_hidden_size * 2)
 
     logger.info("Evaluators created...")
 
@@ -104,8 +102,7 @@ def train(
         hparams.embed_size,
         hparams.cell,
         hparams.layers,
-        hparams.attn_size1,
-        hparams.attn_size2,
+        hparams.attn_size,
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,

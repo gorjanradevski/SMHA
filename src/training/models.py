@@ -28,8 +28,7 @@ class Text2ImageMatchingModel:
         embedding_size: int,
         cell_type: str,
         num_layers: int,
-        attn_size1: int,
-        attn_size2: int,
+        attn_size: int,
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
@@ -65,11 +64,12 @@ class Text2ImageMatchingModel:
             self.keep_prob,
         )
         logger.info("Text encoder graph created...")
-        self.attended_images = self.join_attention_graph(
-            seed, attn_size1, attn_size2, self.image_encoded, reuse=False
+        self.attended_images, self.image_alphas = self.join_attention_graph(
+            attn_size, self.image_encoded
         )
-        self.attended_captions = self.join_attention_graph(
-            seed, attn_size1, attn_size2, self.text_encoded, reuse=True
+        # Reusing the same variables that were used for the images
+        self.attended_captions, self.test_aplhas = self.join_attention_graph(
+            attn_size, self.text_encoded
         )
         logger.info("Attention graph created...")
         self.margin = margin
@@ -127,24 +127,15 @@ class Text2ImageMatchingModel:
                 net = layers_lib.repeat(
                     net, 3, layers.conv2d, 512, [3, 3], scope="conv5"
                 )
-                image_feature_extractor = layers_lib.max_pool2d(
-                    net, [2, 2], scope="pool5"
-                )
+                net = layers_lib.max_pool2d(net, [2, 2], scope="pool5")
 
-        project_layer = tf.layers.dense(
-            image_feature_extractor, 2 * rnn_hidden_size, name="project_image"
+        flatten = tf.reshape(net, (-1, net.shape[3]))
+        project_layer = tf.layers.dense(flatten, 2 * rnn_hidden_size)
+        reshaped = tf.reshape(
+            project_layer, (-1, net.shape[1] * net.shape[2], 2 * rnn_hidden_size)
         )
-        return tf.cast(
-            tf.reshape(
-                project_layer,
-                [
-                    -1,
-                    project_layer.shape[1] * project_layer.shape[2],
-                    2 * rnn_hidden_size,
-                ],
-            ),
-            tf.float32,
-        )
+
+        return reshaped
 
     @staticmethod
     def text_encoder_graph(
@@ -194,76 +185,65 @@ class Text2ImageMatchingModel:
         return tf.concat([output_fw, output_bw], axis=2)
 
     @staticmethod
-    def join_attention_graph(
-        seed: int,
-        attn_size1: int,
-        attn_size2: int,
-        encoded_input: tf.Tensor,
-        reuse=False,
-    ):
+    def join_attention_graph(attn_size: int, encoded_input: tf.Tensor):
         """Applies the same attention on the encoded image and the encoded text.
 
-        As per: https://arxiv.org/pdf/1703.03130.pdf
+        As per: http://www.aclweb.org/anthology/N16-1174/pdf/1703.03130.pdf
 
         The "A structured self-attentative sentence embedding" paper goes through
         the attention mechanism applied here.
 
         Args:
-            seed: The random seed to initialize the weights.
-            attn_size1: The size of the first projection.
-            attn_size2: The size of the second projection.
+            attn_size: The size of the attention.
             encoded_input: The encoded input, can be both the image and the text.
-            reuse: Whether to reuse the variables during the second creation.
 
         Returns:
             Attended output.
 
         """
-        with tf.variable_scope("joint_attention"):
-            project = tf.layers.dense(
-                encoded_input,
-                attn_size1,
-                activation=tf.nn.tanh,
-                kernel_initializer=tf.glorot_uniform_initializer(seed=seed),
-                bias_initializer=tf.zeros_initializer(),
-                reuse=reuse,
-                name="Wa1",
+        with tf.variable_scope(name_or_scope="joint_attention", reuse=tf.AUTO_REUSE):
+            hidden_size = encoded_input.shape[
+                2
+            ].value  # D value - hidden size of the RNN layer
+
+            # Trainable parameters
+            w_omega = tf.get_variable(
+                name="w_omega",
+                initializer=tf.random_normal([hidden_size, attn_size], stddev=0.1),
             )
-            alphas = tf.layers.dense(
-                project,
-                attn_size2,
-                activation=tf.nn.softmax,
-                kernel_initializer=tf.glorot_uniform_initializer(seed=seed),
-                bias_initializer=tf.zeros_initializer(),
-                reuse=reuse,
-                name="Wa2",
+            b_omega = tf.get_variable(
+                name="b_omega", initializer=tf.random_normal([attn_size], stddev=0.1)
             )
-        return tf.matmul(tf.transpose(encoded_input, [0, 2, 1]), alphas)
+            u_omega = tf.get_variable(
+                name="u_omega", initializer=tf.random_normal([attn_size], stddev=0.1)
+            )
+
+            with tf.name_scope("v"):
+                v = tf.tanh(tf.tensordot(encoded_input, w_omega, axes=1) + b_omega)
+
+            vu = tf.tensordot(v, u_omega, axes=1, name="vu")  # (B,T) shape
+            alphas = tf.nn.softmax(vu, name="alphas")  # (B,T) shape
+
+            output = tf.reduce_sum(encoded_input * tf.expand_dims(alphas, -1), 1)
+
+            return output, alphas
 
     @staticmethod
     def compute_loss(
-        attended_images: tf.Tensor, attended_texts: tf.Tensor, margin: float
+        embedding_images: tf.Tensor, embedding_texts: tf.Tensor, margin: float
     ) -> tf.Tensor:
         """Computes the triplet loss.
 
         Args:
-            attended_images: The embedded images.
-            attended_texts: The embedded sentences.
+            embedding_images: The embedded images.
+            embedding_texts: The embedded sentences.
             margin: The contrastive margin.
 
         Returns:
             The contrastive loss using the batch-all strategy.
 
         """
-        embeeding_images = tf.reshape(
-            attended_images,
-            [-1, tf.shape(attended_images)[1] * tf.shape(attended_images)[2]],
-        )
-        embeeding_texts = tf.reshape(
-            attended_texts,
-            [-1, tf.shape(attended_texts)[1] * tf.shape(attended_texts)[2]],
-        )
-        scores = tf.matmul(embeeding_images, embeeding_texts, transpose_b=True)
+        scores = tf.matmul(embedding_images, embedding_texts, transpose_b=True)
         diagonal = tf.diag_part(scores)
 
         # compare every diagonal score to scores in its column

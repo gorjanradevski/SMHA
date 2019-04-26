@@ -21,19 +21,19 @@ def losses():
 @pytest.fixture
 def embedded_captions_p1():
     np.random.seed(42)
-    return np.random.rand(15, 3, 2)[:5, :, :]
+    return np.random.rand(15, 6)[:5, :]
 
 
 @pytest.fixture
 def embedded_captions_p2():
     np.random.seed(42)
-    return np.random.rand(15, 3, 2)[5:12, :, :]
+    return np.random.rand(15, 6)[5:12, :]
 
 
 @pytest.fixture
 def embedded_captions_p3():
     np.random.seed(42)
-    return np.random.rand(15, 3, 2)[12:, :, :]
+    return np.random.rand(15, 6)[12:, :]
 
 
 @pytest.fixture
@@ -45,19 +45,19 @@ def embedded_captions():
 @pytest.fixture
 def embedded_images_p1():
     np.random.seed(40)
-    return np.random.rand(15, 3, 2)[:5, :, :]
+    return np.random.rand(15, 6)[:5, :]
 
 
 @pytest.fixture
 def embedded_images_p2():
     np.random.seed(40)
-    return np.random.rand(15, 3, 2)[5:12, :, :]
+    return np.random.rand(15, 6)[5:12, :]
 
 
 @pytest.fixture
 def embedded_images_p3():
     np.random.seed(40)
-    return np.random.rand(15, 3, 2)[12:, :, :]
+    return np.random.rand(15, 6)[12:, :]
 
 
 @pytest.fixture

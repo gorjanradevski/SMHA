@@ -8,7 +8,6 @@ wd: 0.0001
 learning_rate: 0.0001
 opt: adam
 margin: 0.2
-attn_size1: 10
-attn_size2: 20
+attn_size: 10
 gradient_clip_val: 5
 seed: 42

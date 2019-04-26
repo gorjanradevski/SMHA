@@ -34,14 +34,10 @@ class Evaluator:
         num_samples = embedded_images.shape[0]
         self.embedded_images[
             self.index_update : self.index_update + num_samples, :
-        ] = embedded_images.reshape(
-            [-1, embedded_images.shape[1] * embedded_images.shape[2]]
-        )
+        ] = embedded_images
         self.embedded_captions[
             self.index_update : self.index_update + num_samples, :
-        ] = embedded_captions.reshape(
-            [-1, embedded_captions.shape[1] * embedded_captions.shape[2]]
-        )
+        ] = embedded_captions
         self.index_update += num_samples
 
     def is_best_loss(self) -> bool:

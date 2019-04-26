@@ -67,13 +67,8 @@ def keep_prob():
 
 
 @pytest.fixture
-def attn_size1():
+def attn_size():
     return 10
-
-
-@pytest.fixture
-def attn_size2():
-    return 50
 
 
 @pytest.fixture
@@ -142,20 +137,17 @@ def test_text_encoder(
     assert outputs[2] == 2 * rnn_hidden_size
 
 
-def test_joint_attention(seed, rnn_hidden_size, attn_size1, attn_size2, encoded_input):
+def test_joint_attention(rnn_hidden_size, attn_size, encoded_input):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[5, 10, 100])
-    attention = Text2ImageMatchingModel.join_attention_graph(
-        seed, attn_size1, attn_size2, input_layer
-    )
+    attention = Text2ImageMatchingModel.join_attention_graph(attn_size, input_layer)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        attended_shape = sess.run(
+        attended_input, alphas = sess.run(
             attention, feed_dict={input_layer: encoded_input}
-        ).shape
-        assert attended_shape[0] == 5
-        assert attended_shape[1] == rnn_hidden_size * 2
-        assert attended_shape[2] == attn_size2
+        )
+        assert attended_input.shape[0] == 5
+        assert attended_input.shape[1] == rnn_hidden_size * 2
 
 
 def test_attended_image_text_shape(
@@ -169,8 +161,7 @@ def test_attended_image_text_shape(
     embedding_size,
     cell_type,
     num_layers,
-    attn_size1,
-    attn_size2,
+    attn_size,
     optimizer_type,
     learning_rate,
     clip_value,
@@ -187,8 +178,7 @@ def test_attended_image_text_shape(
         embedding_size,
         cell_type,
         num_layers,
-        attn_size1,
-        attn_size2,
+        attn_size,
         optimizer_type,
         learning_rate,
         clip_value,
@@ -196,4 +186,3 @@ def test_attended_image_text_shape(
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]
-    assert model.attended_images.shape[2] == model.attended_captions.shape[2]
