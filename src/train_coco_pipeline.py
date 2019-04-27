@@ -15,11 +15,6 @@ logger = logging.getLogger(__name__)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 tf.logging.set_verbosity(tf.logging.ERROR)
 
-# TODO: Experiment name generation method
-# TODO: Inference pipeline
-# TODO: Plot multimodal word embeddings script/notebook
-# TODO: Hyperopt optimize pipeline
-
 
 def train(
     hparams_path: str,
@@ -107,6 +102,7 @@ def train(
         hparams.learning_rate,
         hparams.gradient_clip_val,
         log_model_path,
+        hparams.name,
     )
     logger.info("Model created...")
     logger.info("Training is starting...")

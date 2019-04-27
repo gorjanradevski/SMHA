@@ -1,3 +1,4 @@
+name: AAA
 min_unk_sub: 5
 embed_size: 300
 layers: 2

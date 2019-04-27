@@ -32,19 +32,25 @@ class Text2ImageMatchingModel:
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
-        log_dir: str,
+        log_dir: str = "",
+        name: str = "",
     ):
+        # Name of the model
+        self.name = name
         # Get images, captions, lengths and labels
         self.images = images
         self.captions = captions
         self.captions_len = captions_len
-        # Create summary writers and global step
-        self.file_writer = tf.summary.FileWriter(log_dir)
-        self.train_loss_ph, self.train_loss_summary = self.create_summary("train_loss")
-        self.val_loss_ph, self.val_loss_summary = self.create_summary("val_loss")
-        self.val_recall_at_k_ph, self.val_recall_at_k_summary = self.create_summary(
-            "val_recall_at_k"
-        )
+        # Create summary writers
+        if log_dir != "":
+            self.file_writer = tf.summary.FileWriter(log_dir + self.name)
+            self.train_loss_ph, self.train_loss_summary = self.create_summary(
+                "train_loss"
+            )
+            self.val_loss_ph, self.val_loss_summary = self.create_summary("val_loss")
+            self.val_recall_at_k_ph, self.val_recall_at_k_summary = self.create_summary(
+                "val_recall_at_k"
+            )
         self.global_step = tf.Variable(0, trainable=False, name="global_step")
         # Create dropout and weight decay placeholder
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
@@ -362,4 +368,4 @@ class Text2ImageMatchingModel:
         Returns:
 
         """
-        self.saver_loader.save(sess, save_path)
+        self.saver_loader.save(sess, save_path + self.name)
