@@ -8,6 +8,7 @@ from datetime import datetime
 from ruamel.yaml import YAML
 from typing import Dict, Any
 import logging
+from tqdm import tqdm
 
 from training.datasets import Flickr8kDataset, get_vocab_size
 from training.models import Text2ImageMatchingModel
@@ -203,8 +204,12 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
                 # Initialize iterator with training data
                 sess.run(loader.train_init)
                 try:
-                    while True:
-                        _, loss = sess.run([model.optimize, model.loss])
+                    with tqdm(total=len(train_image_paths)) as pbar:
+                        while True:
+                            _, loss, lengths = sess.run(
+                                [model.optimize, model.loss, model.captions_len]
+                            )
+                            pbar.update(len(lengths))
                 except tf.errors.OutOfRangeError:
                     pass
 
