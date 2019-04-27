@@ -41,6 +41,7 @@ def train(
         val_imgs_file_path: Path to a file with the val image names.
         epochs: The number of epochs to train the model.
         batch_size: The batch size to be used.
+        prefetch_size: How many batches to keep on GPU ready for processing.
         checkpoint_path: Path to a valid model checkpoint.
         imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
@@ -242,7 +243,7 @@ def parse_args():
         "--val_imgs_file_path",
         type=str,
         default="data/Flickr8k_dataset/Flickr8k_text/Flickr_8k.devImages.txt",
-        help="Path to the file where the train images names are included.",
+        help="Path to the file where the validation images names are included.",
     )
     parser.add_argument(
         "--checkpoint_path",
