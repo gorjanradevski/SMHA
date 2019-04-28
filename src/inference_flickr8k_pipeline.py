@@ -72,6 +72,7 @@ def inference(
         images,
         captions,
         captions_lengths,
+        hparams.finetune,
         hparams.margin,
         hparams.rnn_hidden_size,
         get_vocab_size(Flickr8kDataset),

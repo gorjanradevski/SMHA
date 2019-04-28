@@ -22,6 +22,7 @@ class Text2ImageMatchingModel:
         images: tf.Tensor,
         captions: tf.Tensor,
         captions_len: tf.Tensor,
+        finetune: bool,
         margin: float,
         rnn_hidden_size: int,
         vocab_size: int,
@@ -56,7 +57,9 @@ class Text2ImageMatchingModel:
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
         # Build model
-        self.image_encoded = self.image_encoder_graph(self.images, rnn_hidden_size)
+        self.image_encoded = self.image_encoder_graph(
+            self.images, rnn_hidden_size, finetune
+        )
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
             seed,
@@ -87,13 +90,15 @@ class Text2ImageMatchingModel:
         )
         # Imagenet graph loader and graph saver/loader
         self.image_encoder_loader = tf.train.Saver(
-            tf.trainable_variables(scope="vgg_16")
+            tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_16")
         )
         self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")
 
     @staticmethod
-    def image_encoder_graph(images: tf.Tensor, rnn_hidden_size: int) -> tf.Tensor:
+    def image_encoder_graph(
+        images: tf.Tensor, rnn_hidden_size: int, finetune: bool
+    ) -> tf.Tensor:
         """Extract higher level features from the image using a conv net pretrained on
         Image net.
 
@@ -103,6 +108,7 @@ class Text2ImageMatchingModel:
         Args:
             images: The input images.
             rnn_hidden_size: The hidden size of its text counterpart.
+            finetune: Whether to finetune the image encoder.
 
         Returns:
             The encoded image.
@@ -115,23 +121,53 @@ class Text2ImageMatchingModel:
                 outputs_collections=end_points_collection,
             ):
                 net = layers_lib.repeat(
-                    images, 2, layers.conv2d, 64, [3, 3], scope="conv1"
+                    images,
+                    2,
+                    layers.conv2d,
+                    64,
+                    [3, 3],
+                    scope="conv1",
+                    trainable=finetune,
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool1")
                 net = layers_lib.repeat(
-                    net, 2, layers.conv2d, 128, [3, 3], scope="conv2"
+                    net,
+                    2,
+                    layers.conv2d,
+                    128,
+                    [3, 3],
+                    scope="conv2",
+                    trainable=finetune,
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool2")
                 net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 256, [3, 3], scope="conv3"
+                    net,
+                    3,
+                    layers.conv2d,
+                    256,
+                    [3, 3],
+                    scope="conv3",
+                    trainable=finetune,
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool3")
                 net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 512, [3, 3], scope="conv4"
+                    net,
+                    3,
+                    layers.conv2d,
+                    512,
+                    [3, 3],
+                    scope="conv4",
+                    trainable=finetune,
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool4")
                 net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 512, [3, 3], scope="conv5"
+                    net,
+                    3,
+                    layers.conv2d,
+                    512,
+                    [3, 3],
+                    scope="conv5",
+                    trainable=finetune,
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool5")
 
@@ -249,23 +285,24 @@ class Text2ImageMatchingModel:
             The contrastive loss using the batch-all strategy.
 
         """
-        scores = tf.matmul(embedding_images, embedding_texts, transpose_b=True)
-        diagonal = tf.diag_part(scores)
+        with tf.variable_scope(name_or_scope="loss"):
+            scores = tf.matmul(embedding_images, embedding_texts, transpose_b=True)
+            diagonal = tf.diag_part(scores)
 
-        # compare every diagonal score to scores in its column
-        # (i.e, all contrastive images for each sentence)
-        cost_s = tf.maximum(0.0, margin - diagonal + scores)
-        # compare every diagonal score to scores in its row
-        # (i.e, all contrastive sentences for each image)
-        cost_im = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
+            # compare every diagonal score to scores in its column
+            # (i.e, all contrastive images for each sentence)
+            cost_s = tf.maximum(0.0, margin - diagonal + scores)
+            # compare every diagonal score to scores in its row
+            # (i.e, all contrastive sentences for each image)
+            cost_im = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
 
-        # clear diagonals
-        cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
-        cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
+            # clear diagonals
+            cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
+            cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-        loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
+            loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
-        return loss
+            return loss
 
     def apply_gradients_op(
         self,
@@ -286,13 +323,14 @@ class Text2ImageMatchingModel:
             An operation node to be executed in order to apply the computed gradients.
 
         """
-        optimizer = optimizer_factory(optimizer_type, learning_rate)
-        gradients, variables = zip(*optimizer.compute_gradients(loss))
-        gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
+        with tf.variable_scope(name_or_scope="optimizer"):
+            optimizer = optimizer_factory(optimizer_type, learning_rate)
+            gradients, variables = zip(*optimizer.compute_gradients(loss))
+            gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
 
-        return optimizer.apply_gradients(
-            zip(gradients, variables), global_step=self.global_step
-        )
+            return optimizer.apply_gradients(
+                zip(gradients, variables), global_step=self.global_step
+            )
 
     def init(
         self, sess: tf.Session, checkpoint_path: str, imagenet_checkpoint: bool

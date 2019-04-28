@@ -37,6 +37,11 @@ def labels():
 
 
 @pytest.fixture
+def finetune():
+    return True
+
+
+@pytest.fixture
 def margin():
     return 0.0
 
@@ -91,11 +96,11 @@ def clip_value():
     return 0.0
 
 
-def test_image_encoder(input_images, rnn_hidden_size):
+def test_image_encoder(input_images, rnn_hidden_size, finetune):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[3, 224, 224, 3])
     image_encoded = Text2ImageMatchingModel.image_encoder_graph(
-        input_layer, rnn_hidden_size
+        input_layer, rnn_hidden_size, finetune
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -155,6 +160,7 @@ def test_attended_image_text_shape(
     input_images,
     captions,
     captions_len,
+    finetune,
     margin,
     rnn_hidden_size,
     vocab_size,
@@ -172,6 +178,7 @@ def test_attended_image_text_shape(
         input_images,
         captions,
         captions_len,
+        finetune,
         margin,
         rnn_hidden_size,
         vocab_size,
