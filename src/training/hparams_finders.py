@@ -3,11 +3,12 @@ import numpy as np
 import random
 import string
 from abc import ABC, abstractmethod
-from hyperopt import fmin, tpe, space_eval, hp
+from hyperopt import fmin, tpe, space_eval, hp, Trials
 from datetime import datetime
 from ruamel.yaml import YAML
 from typing import Dict, Any
 import logging
+import pickle
 
 from training.datasets import Flickr8kDataset, get_vocab_size
 from training.models import Text2ImageMatchingModel
@@ -51,22 +52,22 @@ class BaseHparamsFinder(ABC):
         # Default seed value
         self.seed = 42
         # Generate experiment name
-        self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(3))
+        self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
         self.search_space = {
-            "min_unk_sub": hp.choice("min_unk_sub", range(1, 10)),
-            "embed_size": hp.choice("embed_size", range(50, 300)),
+            "min_unk_sub": hp.choice("min_unk_sub", range(3, 7)),
+            "embed_size": hp.choice("embed_size", range(150, 300)),
             "layers": hp.choice("layers", range(1, 3)),
-            "rnn_hidden_size": hp.choice("rnn_hidden_size", range(64, 256)),
+            "rnn_hidden_size": hp.choice("rnn_hidden_size", range(128, 256)),
             "cell": hp.choice("cell", ["lstm", "gru"]),
             "keep_prob": hp.uniform("keep_prob", 0.4, 0.9),
             "wd": hp.loguniform("wd", np.log(0.000_001), np.log(0.1)),
             "learning_rate": hp.loguniform(
-                "learning_rate", np.log(0.00001), np.log(0.3)
+                "learning_rate", np.log(0.000_001), np.log(0.3)
             ),
             "opt": hp.choice("opt", ["adam", "sgd", "adadelta"]),
             "margin": hp.uniform("margin", 0.001, 5),
-            "attn_size": hp.choice("attn_size", range(5, 50)),
+            "attn_size": hp.choice("attn_size", range(10, 50)),
             "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
         }
 
@@ -84,7 +85,12 @@ class BaseHparamsFinder(ABC):
         """
         pass
 
-    def find_best(self, max_evals: int, dump_hparams_path: str) -> None:
+    def find_best(self, max_evals: int, hparams_path: str, trials_path: str) -> None:
+        try:
+            trials = pickle.load(open(trials_path, "rb"))
+            max_evals += len(trials.trials)
+        except FileNotFoundError:
+            trials = Trials()
         best_hparams = space_eval(
             self.search_space,
             fmin(
@@ -93,11 +99,14 @@ class BaseHparamsFinder(ABC):
                 algo=tpe.suggest,
                 max_evals=max_evals,
                 show_progressbar=False,
+                trials=trials,
             ),
         )
         best_hparams["name"] = self.name
         best_hparams["seed"] = self.seed
-        with open(dump_hparams_path + self.name + ".yaml", "w") as yaml_file:
+        with open(trials_path, "wb") as trials_file:
+            pickle.dump(trials_path, trials_file)
+        with open(hparams_path, "w") as yaml_file:
             YAML().dump(best_hparams, yaml_file)
 
 

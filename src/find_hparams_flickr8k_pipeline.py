@@ -18,7 +18,8 @@ def optimize(
     epochs: int,
     recall_at: int,
     max_evals: int,
-    dump_hparams_path: str,
+    hparams_path: str,
+    trials_path: str,
 ) -> None:
     """Searches for the best hyperparameters based on the validation recall at K score
     and dumps them as a yaml file.
@@ -34,7 +35,8 @@ def optimize(
         epochs: The number of epochs per experiment.
         recall_at: Recall at K (this is K) evaluation metric.
         max_evals: How many times to do random sampling.
-        dump_hparams_path: Where to dump the hparams.
+        hparams_path: Where to dump the hparams.
+        trials_path: Read/write the trials object.
 
     Returns:
         None
@@ -51,7 +53,7 @@ def optimize(
         epochs,
         recall_at,
     )
-    hparams_finder.find_best(max_evals, dump_hparams_path)
+    hparams_finder.find_best(max_evals, hparams_path, trials_path)
 
 
 def main():
@@ -69,7 +71,8 @@ def main():
         args.epochs,
         args.recall_at,
         args.max_evals,
-        args.dump_hparams_path,
+        args.hparams_path,
+        args.trials_path,
     )
 
 
@@ -134,10 +137,16 @@ def parse_args():
         help="How many times to sample and evaluate in order to find the best hparams.",
     )
     parser.add_argument(
-        "--dump_hparams_path",
+        "--hparams_path",
         type=str,
-        default="hyperparameters/",
+        default="hyperparameters/experiment.yaml",
         help="Where to dump the found hparams.",
+    )
+    parser.add_argument(
+        "--trials_path",
+        type=str,
+        default="trials/experiment.pkl",
+        help="From where to read or where to dump the trials object.",
     )
     return parser.parse_args()
 
