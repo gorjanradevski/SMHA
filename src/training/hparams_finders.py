@@ -105,7 +105,7 @@ class BaseHparamsFinder(ABC):
         best_hparams["name"] = self.name
         best_hparams["seed"] = self.seed
         with open(trials_path, "wb") as trials_file:
-            pickle.dump(trials_path, trials_file)
+            pickle.dump(trials, trials_file)
         with open(hparams_path, "w") as yaml_file:
             YAML().dump(best_hparams, yaml_file)
 
