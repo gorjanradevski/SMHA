@@ -55,7 +55,7 @@ class BaseHparamsFinder(ABC):
         self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
         self.search_space = {
-            "finetune": hp.choice("finetune", [True, True, False]),
+            "finetune": False,
             "min_unk_sub": hp.choice("min_unk_sub", range(3, 7)),
             "embed_size": hp.choice("embed_size", range(150, 300)),
             "layers": hp.choice("layers", range(1, 3)),
