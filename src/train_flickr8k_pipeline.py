@@ -126,7 +126,11 @@ def train(
                 with tqdm(total=len(train_image_paths)) as pbar:
                     while True:
                         _, loss, lengths = sess.run(
-                            [model.optimize, model.loss, model.captions_len]
+                            [model.optimize, model.loss, model.captions_len],
+                            feed_dict={
+                                model.keep_prob: hparams.keep_prob,
+                                model.weight_decay: hparams.weight_decay,
+                            },
                         )
                         evaluator_train.update_metrics(loss)
                         pbar.update(len(lengths))

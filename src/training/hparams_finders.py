@@ -55,14 +55,14 @@ class BaseHparamsFinder(ABC):
         self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
         self.search_space = {
-            "finetune": hp.choice("finetune", [True, False]),
+            "finetune": hp.choice("finetune", [True, True, False]),
             "min_unk_sub": hp.choice("min_unk_sub", range(3, 7)),
             "embed_size": hp.choice("embed_size", range(150, 300)),
             "layers": hp.choice("layers", range(1, 3)),
             "rnn_hidden_size": hp.choice("rnn_hidden_size", range(128, 256)),
             "cell": hp.choice("cell", ["lstm", "gru"]),
             "keep_prob": hp.uniform("keep_prob", 0.4, 0.9),
-            "wd": hp.loguniform("wd", np.log(0.000_001), np.log(0.1)),
+            "weight_decay": hp.loguniform("wd", np.log(0.000_001), np.log(0.1)),
             "learning_rate": hp.loguniform(
                 "learning_rate", np.log(0.000_001), np.log(0.3)
             ),
@@ -159,6 +159,8 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
         opt = args["opt"]
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
+        keep_prob = args["keep_prob"]
+        weight_decay = args["weight_decay"]
 
         dataset = Flickr8kDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
@@ -216,7 +218,13 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
                 sess.run(loader.train_init)
                 try:
                     while True:
-                        _, loss = sess.run([model.optimize, model.loss])
+                        _, loss = sess.run(
+                            [model.optimize, model.loss],
+                            feed_dict={
+                                model.keep_prob: keep_prob,
+                                model.weight_decay: weight_decay,
+                            },
+                        )
                 except tf.errors.OutOfRangeError:
                     pass
 

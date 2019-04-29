@@ -83,7 +83,7 @@ class Text2ImageMatchingModel:
         logger.info("Attention graph created...")
         self.margin = margin
         self.loss = self.compute_loss(
-            self.attended_images, self.attended_captions, self.margin
+            self.attended_images, self.attended_captions, self.margin, self.weight_decay
         )
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
@@ -272,7 +272,10 @@ class Text2ImageMatchingModel:
 
     @staticmethod
     def compute_loss(
-        embedding_images: tf.Tensor, embedding_texts: tf.Tensor, margin: float
+        embedding_images: tf.Tensor,
+        embedding_texts: tf.Tensor,
+        margin: float,
+        weight_decay: float,
     ) -> tf.Tensor:
         """Computes the triplet loss.
 
@@ -280,6 +283,7 @@ class Text2ImageMatchingModel:
             embedding_images: The embedded images.
             embedding_texts: The embedded sentences.
             margin: The contrastive margin.
+            weight_decay: The L2 coefficient for the regularization constant.
 
         Returns:
             The contrastive loss using the batch-all strategy.
@@ -302,7 +306,18 @@ class Text2ImageMatchingModel:
 
             loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
-            return loss
+            l2 = (
+                tf.add_n(
+                    [
+                        tf.nn.l2_loss(v)
+                        for v in tf.trainable_variables()
+                        if "bias" not in v.name
+                    ]
+                )
+                * weight_decay
+            )
+
+            return loss + l2
 
     def apply_gradients_op(
         self,
