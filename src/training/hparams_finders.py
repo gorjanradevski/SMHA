@@ -55,7 +55,6 @@ class BaseHparamsFinder(ABC):
         self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
         self.search_space = {
-            "finetune": False,
             "min_unk_sub": hp.choice("min_unk_sub", range(3, 7)),
             "embed_size": hp.choice("embed_size", range(150, 300)),
             "layers": hp.choice("layers", range(1, 3)),
@@ -148,7 +147,6 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
     def objective(self, args: Dict[str, Any]):
         logger.info(f"Trying out hyperparameters: {args}")
 
-        finetune = args["finetune"]
         min_unk_sub = args["min_unk_sub"]
         rnn_hidden_size = args["rnn_hidden_size"]
         margin = args["margin"]
@@ -194,7 +192,6 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
             images,
             captions,
             captions_lengths,
-            finetune,
             margin,
             rnn_hidden_size,
             get_vocab_size(Flickr8kDataset),

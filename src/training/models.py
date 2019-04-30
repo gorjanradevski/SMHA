@@ -22,7 +22,6 @@ class Text2ImageMatchingModel:
         images: tf.Tensor,
         captions: tf.Tensor,
         captions_len: tf.Tensor,
-        finetune: bool,
         margin: float,
         rnn_hidden_size: int,
         vocab_size: int,
@@ -57,9 +56,7 @@ class Text2ImageMatchingModel:
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
         # Build model
-        self.image_encoded = self.image_encoder_graph(
-            self.images, rnn_hidden_size, finetune
-        )
+        self.image_encoded = self.image_encoder_graph(self.images, rnn_hidden_size)
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
             seed,
@@ -77,7 +74,7 @@ class Text2ImageMatchingModel:
             attn_size, self.image_encoded
         )
         # Reusing the same variables that were used for the images
-        self.attended_captions, self.test_aplhas = self.join_attention_graph(
+        self.attended_captions, self.text_alphas = self.join_attention_graph(
             attn_size, self.text_encoded
         )
         logger.info("Attention graph created...")
@@ -96,9 +93,7 @@ class Text2ImageMatchingModel:
         logger.info("Graph creation finished...")
 
     @staticmethod
-    def image_encoder_graph(
-        images: tf.Tensor, rnn_hidden_size: int, finetune: bool
-    ) -> tf.Tensor:
+    def image_encoder_graph(images: tf.Tensor, rnn_hidden_size: int) -> tf.Tensor:
         """Extract higher level features from the image using a conv net pretrained on
         Image net.
 
@@ -108,7 +103,6 @@ class Text2ImageMatchingModel:
         Args:
             images: The input images.
             rnn_hidden_size: The hidden size of its text counterpart.
-            finetune: Whether to finetune the image encoder.
 
         Returns:
             The encoded image.
@@ -121,53 +115,23 @@ class Text2ImageMatchingModel:
                 outputs_collections=end_points_collection,
             ):
                 net = layers_lib.repeat(
-                    images,
-                    2,
-                    layers.conv2d,
-                    64,
-                    [3, 3],
-                    scope="conv1",
-                    trainable=finetune,
+                    images, 2, layers.conv2d, 64, [3, 3], scope="conv1", trainable=False
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool1")
                 net = layers_lib.repeat(
-                    net,
-                    2,
-                    layers.conv2d,
-                    128,
-                    [3, 3],
-                    scope="conv2",
-                    trainable=finetune,
+                    net, 2, layers.conv2d, 128, [3, 3], scope="conv2", trainable=False
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool2")
                 net = layers_lib.repeat(
-                    net,
-                    3,
-                    layers.conv2d,
-                    256,
-                    [3, 3],
-                    scope="conv3",
-                    trainable=finetune,
+                    net, 3, layers.conv2d, 256, [3, 3], scope="conv3", trainable=False
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool3")
                 net = layers_lib.repeat(
-                    net,
-                    3,
-                    layers.conv2d,
-                    512,
-                    [3, 3],
-                    scope="conv4",
-                    trainable=finetune,
+                    net, 3, layers.conv2d, 512, [3, 3], scope="conv4", trainable=False
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool4")
                 net = layers_lib.repeat(
-                    net,
-                    3,
-                    layers.conv2d,
-                    512,
-                    [3, 3],
-                    scope="conv5",
-                    trainable=finetune,
+                    net, 3, layers.conv2d, 512, [3, 3], scope="conv5", trainable=False
                 )
                 net = layers_lib.max_pool2d(net, [2, 2], scope="pool5")
 
@@ -244,9 +208,9 @@ class Text2ImageMatchingModel:
 
         """
         with tf.variable_scope(name_or_scope="joint_attention", reuse=tf.AUTO_REUSE):
-            hidden_size = encoded_input.shape[
-                2
-            ].value  # D value - hidden size of the RNN layer
+            # Shape parameters
+            time_steps = tf.shape(encoded_input)[1]
+            hidden_size = encoded_input.get_shape()[2].value
 
             # Trainable parameters
             w_omega = tf.get_variable(
@@ -257,15 +221,21 @@ class Text2ImageMatchingModel:
                 name="b_omega", initializer=tf.random_normal([attn_size], stddev=0.1)
             )
             u_omega = tf.get_variable(
-                name="u_omega", initializer=tf.random_normal([attn_size], stddev=0.1)
+                name="u_omega", initializer=tf.random_normal([attn_size, 1], stddev=0.1)
             )
 
-            with tf.name_scope("v"):
-                v = tf.tanh(tf.tensordot(encoded_input, w_omega, axes=1) + b_omega)
-
-            vu = tf.tensordot(v, u_omega, axes=1, name="vu")  # (B,T) shape
-            alphas = tf.nn.softmax(vu, name="alphas")  # (B,T) shape
-
+            # Apply attention
+            # [B * T, H]
+            encoded_input_reshaped = tf.reshape(encoded_input, [-1, hidden_size])
+            # [B * T, A]
+            v = tf.tanh(tf.matmul(encoded_input_reshaped, w_omega) + b_omega)
+            # [B * T, 1]
+            vu = tf.matmul(v, u_omega)
+            # [B, T]
+            vu = tf.reshape(vu, [-1, time_steps])
+            # [B, T]
+            alphas = tf.nn.softmax(vu, name="alphas")
+            # [B, T]
             output = tf.reduce_sum(encoded_input * tf.expand_dims(alphas, -1), 1)
 
             return output, alphas
