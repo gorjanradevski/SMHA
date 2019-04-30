@@ -55,18 +55,18 @@ class BaseHparamsFinder(ABC):
         self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
         self.search_space = {
-            "min_unk_sub": hp.choice("min_unk_sub", range(3, 7)),
+            "min_unk_sub": hp.choice("min_unk_sub", range(3, 10)),
             "embed_size": hp.choice("embed_size", range(150, 300)),
             "layers": hp.choice("layers", range(1, 3)),
             "rnn_hidden_size": hp.choice("rnn_hidden_size", range(128, 256)),
             "cell": hp.choice("cell", ["lstm", "gru"]),
             "keep_prob": hp.uniform("keep_prob", 0.4, 0.9),
-            "weight_decay": hp.loguniform("wd", np.log(0.000_001), np.log(0.1)),
+            "weight_decay": hp.loguniform("wd", np.log(0.000_001), np.log(0.01)),
             "learning_rate": hp.loguniform(
-                "learning_rate", np.log(0.000_001), np.log(0.3)
+                "learning_rate", np.log(0.000_001), np.log(0.01)
             ),
             "opt": hp.choice("opt", ["adam", "sgd", "adadelta"]),
-            "margin": hp.uniform("margin", 0.001, 5),
+            "margin": hp.uniform("margin", 0.0001, 5),
             "attn_size": hp.choice("attn_size", range(10, 50)),
             "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
         }
