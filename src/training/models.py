@@ -133,7 +133,6 @@ class Text2ImageMatchingModel:
                 net = layers_lib.repeat(
                     net, 3, layers.conv2d, 512, [3, 3], scope="conv5", trainable=False
                 )
-                net = layers_lib.max_pool2d(net, [2, 2], scope="pool5")
 
         flatten = tf.reshape(net, (-1, net.shape[3]))
         project_layer = tf.layers.dense(flatten, 2 * rnn_hidden_size)
