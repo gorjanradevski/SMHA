@@ -233,8 +233,8 @@ class Text2ImageMatchingModel:
             # [B, T]
             vu = tf.reshape(vu, [-1, time_steps])
             # [B, T]
-            alphas = tf.nn.softmax(vu, name="alphas")
-            # [B, T]
+            alphas = tf.nn.softmax(vu, name="alphas", axis=1)
+            # [B, H]
             output = tf.reduce_sum(encoded_input * tf.expand_dims(alphas, -1), 1)
 
             return output, alphas

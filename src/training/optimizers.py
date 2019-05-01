@@ -16,7 +16,7 @@ def optimizer_factory(optimizer_type: str, learning_rate: float) -> tf.train.Opt
         return tf.train.AdamOptimizer(learning_rate)
     elif optimizer_type == "sgd":
         return tf.train.GradientDescentOptimizer(learning_rate)
-    elif optimizer_type == "adadelta":
-        return tf.train.AdadeltaOptimizer(learning_rate)
+    elif optimizer_type == "rmsprop":
+        return tf.train.RMSPropOptimizer(learning_rate)
     else:
         raise ValueError("Optimizer type not recognized")
