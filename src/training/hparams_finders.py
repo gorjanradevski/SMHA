@@ -9,6 +9,7 @@ from ruamel.yaml import YAML
 from typing import Dict, Any
 import logging
 import pickle
+import sys
 
 from training.datasets import Flickr8kDataset, get_vocab_size
 from training.models import Text2ImageMatchingModel
@@ -49,8 +50,8 @@ class BaseHparamsFinder(ABC):
         self.imagenet_checkpoint_path = imagenet_checkpoint_path
         self.epochs = epochs
         self.recall_at = recall_at
-        # Default seed value
-        self.seed = 42
+        # Set seed value for all experiments in the current iteration
+        self.seed = datetime.now().microsecond
         # Generate experiment name
         self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
@@ -89,8 +90,10 @@ class BaseHparamsFinder(ABC):
         try:
             trials = pickle.load(open(trials_path, "rb"))
             max_evals += len(trials.trials)
+            last_best = trials.best_trial["result"]["loss"]
         except FileNotFoundError:
             trials = Trials()
+            last_best = sys.maxsize
         best_hparams = space_eval(
             self.search_space,
             fmin(
@@ -102,12 +105,17 @@ class BaseHparamsFinder(ABC):
                 trials=trials,
             ),
         )
-        best_hparams["name"] = self.name
-        best_hparams["seed"] = self.seed
+        # Dump Trials object always
         with open(trials_path, "wb") as trials_file:
             pickle.dump(trials, trials_file)
-        with open(hparams_path, "w") as yaml_file:
-            YAML().dump(best_hparams, yaml_file)
+
+        # Dump hparams only if better result was achieved
+        if trials.best_trial["result"]["loss"] < last_best:
+            best_hparams["name"] = self.name
+            best_hparams["seed"] = self.seed
+
+            with open(hparams_path, "w") as yaml_file:
+                YAML().dump(best_hparams, yaml_file)
 
 
 class Flickr8kHparamsFinder(BaseHparamsFinder):
@@ -172,7 +180,6 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
         evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * 2)
 
         # Resetting the default graph and setting the random seed
-        self.seed = datetime.now().microsecond
         tf.reset_default_graph()
         tf.set_random_seed(self.seed)
 
