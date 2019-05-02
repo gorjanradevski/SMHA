@@ -94,6 +94,7 @@ class BaseHparamsFinder(ABC):
         except FileNotFoundError:
             trials = Trials()
             last_best = sys.maxsize
+        logger.info(f"Last best from previous iteration was: {last_best}")
         best_hparams = space_eval(
             self.search_space,
             fmin(
