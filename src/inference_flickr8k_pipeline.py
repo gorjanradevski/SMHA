@@ -36,6 +36,7 @@ def inference(
         texts_path: Path where the text doc with the descriptions is.
         test_imgs_file_path: Path to a file with the test image names.
         batch_size: The batch size to be used.
+        prefetch_size: How many batches to prefetch.
         checkpoint_path: Path to a valid model checkpoint.
 
     Returns:
@@ -109,8 +110,9 @@ def inference(
             pass
 
     for recall_at in inference_for_recall_at:
-        evaluator_test.image2text_recall_at_k(recall_at)
-        logger.info(f"The recall at {recall_at} is: {evaluator_test.recall_at_k}")
+        logger.info(
+            f"The recall at {recall_at} is: {evaluator_test.image2text_recall_at_k(recall_at)}"
+        )
 
 
 def main():

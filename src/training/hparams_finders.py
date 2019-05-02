@@ -246,10 +246,7 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
                 except tf.errors.OutOfRangeError:
                     pass
 
-                # Update recall at K
-                evaluator_val.image2text_recall_at_k(self.recall_at)
+                if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
+                    evaluator_val.update_best_image2text_recall_at_k(self.recall_at)
 
-                if evaluator_val.is_best_recall_at_k():
-                    evaluator_val.update_best_recall_at_k()
-
-        return -evaluator_val.best_recall_at_k
+        return -evaluator_val.best_image2text_recall_at_k
