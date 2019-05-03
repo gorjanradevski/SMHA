@@ -220,7 +220,8 @@ class Text2ImageMatchingModel:
                 name="b_omega", initializer=tf.random_normal([attn_size], stddev=0.1)
             )
             u_omega = tf.get_variable(
-                name="u_omega", initializer=tf.random_normal([attn_size, 1], stddev=0.1)
+                name="u_omega",
+                initializer=tf.random_normal([attn_size, attn_size], stddev=0.1),
             )
 
             # Apply attention
@@ -228,14 +229,18 @@ class Text2ImageMatchingModel:
             encoded_input_reshaped = tf.reshape(encoded_input, [-1, hidden_size])
             # [B * T, A]
             v = tf.tanh(tf.matmul(encoded_input_reshaped, w_omega) + b_omega)
-            # [B * T, 1]
+            # [B * T, A]
             vu = tf.matmul(v, u_omega)
-            # [B, T]
-            vu = tf.reshape(vu, [-1, time_steps])
-            # [B, T]
-            alphas = tf.nn.softmax(vu, name="alphas", axis=1)
-            # [B, H]
-            output = tf.reduce_sum(encoded_input * tf.expand_dims(alphas, -1), 1)
+            # [B, T, A]
+            vu = tf.reshape(vu, [-1, time_steps, attn_size])
+            # [B, A, T]
+            vu_transposed = tf.transpose(vu, [0, 2, 1])
+            # [B, A, T]
+            alphas = tf.nn.softmax(vu_transposed, name="alphas", axis=2)
+            # [B, A, H]
+            output = tf.matmul(alphas, encoded_input)
+            # [B, A * H]
+            output = tf.reshape(output, [-1, attn_size * hidden_size])
 
             return output, alphas
 
