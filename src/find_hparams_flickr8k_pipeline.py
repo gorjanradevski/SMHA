@@ -17,7 +17,7 @@ def optimize(
     imagenet_checkpoint_path: str,
     epochs: int,
     recall_at: int,
-    max_evals: int,
+    num_iters: int,
     hparams_path: str,
     trials_path: str,
 ) -> None:
@@ -34,7 +34,7 @@ def optimize(
         imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
         epochs: The number of epochs per experiment.
         recall_at: Recall at K (this is K) evaluation metric.
-        max_evals: How many times to do random sampling.
+        num_iters: How many times to do random sampling.
         hparams_path: Where to dump the hparams.
         trials_path: Read/write the trials object.
 
@@ -53,7 +53,7 @@ def optimize(
         epochs,
         recall_at,
     )
-    hparams_finder.find_best(max_evals, hparams_path, trials_path)
+    hparams_finder.find_best(num_iters, hparams_path, trials_path)
 
 
 def main():
@@ -70,7 +70,7 @@ def main():
         args.checkpoint_path,
         args.epochs,
         args.recall_at,
-        args.max_evals,
+        args.num_iters,
         args.hparams_path,
         args.trials_path,
     )
@@ -131,7 +131,7 @@ def parse_args():
         "--recall_at", type=int, default=5, help="Validate with recall at K (input)."
     )
     parser.add_argument(
-        "--max_evals",
+        "--num_iters",
         type=int,
         default=10,
         help="How many times to sample and evaluate in order to find the best hparams.",
