@@ -29,6 +29,8 @@ class Text2ImageMatchingModel:
         cell_type: str,
         num_layers: int,
         attn_size: int,
+        attn_hops: int,
+        frob_norm_pen: float,
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
@@ -71,23 +73,14 @@ class Text2ImageMatchingModel:
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.join_attention_graph(
-            attn_size, self.image_encoded
+            attn_size, attn_hops, self.image_encoded
         )
         # Reusing the same variables that were used for the images
         self.attended_captions, self.text_alphas = self.join_attention_graph(
-            attn_size, self.text_encoded
+            attn_size, attn_hops, self.text_encoded
         )
         logger.info("Attention graph created...")
-        self.margin = margin
-        self.loss = self.compute_loss(
-            self.attended_images,
-            self.attended_captions,
-            self.margin,
-            self.weight_decay,
-            attn_size,
-            self.image_alphas,
-            self.text_alphas,
-        )
+        self.loss = self.compute_loss(margin, attn_hops, frob_norm_pen)
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
@@ -182,6 +175,7 @@ class Text2ImageMatchingModel:
                 tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
                 dtype=tf.float32,
                 trainable=True,
+                name="embeddings",
             )
             inputs = tf.nn.embedding_lookup(embeddings, captions)
             cell_fw = cell_factory(
@@ -196,16 +190,17 @@ class Text2ImageMatchingModel:
         return tf.concat([output_fw, output_bw], axis=2)
 
     @staticmethod
-    def join_attention_graph(attn_size: int, encoded_input: tf.Tensor):
+    def join_attention_graph(attn_size: int, attn_hops: int, encoded_input: tf.Tensor):
         """Applies the same attention on the encoded image and the encoded text.
 
-        As per: http://www.aclweb.org/anthology/N16-1174/pdf/1703.03130.pdf
+        As per: https://arxiv.org/pdf/1703.03130.pdf
 
         The "A structured self-attentative sentence embedding" paper goes through
         the attention mechanism applied here.
 
         Args:
             attn_size: The size of the attention.
+            attn_hops: How many hops of attention to apply.
             encoded_input: The encoded input, can be both the image and the text.
 
         Returns:
@@ -227,37 +222,47 @@ class Text2ImageMatchingModel:
             )
             u_omega = tf.get_variable(
                 name="u_omega",
-                initializer=tf.random_normal([attn_size, attn_size], stddev=0.1),
+                initializer=tf.random_normal([attn_size, attn_hops], stddev=0.1),
             )
 
             # Apply attention
             # [B * T, H]
             encoded_input_reshaped = tf.reshape(encoded_input, [-1, hidden_size])
-            # [B * T, A]
+            # [B * T, A_size]
             v = tf.tanh(tf.matmul(encoded_input_reshaped, w_omega) + b_omega)
-            # [B * T, A]
+            # [B * T, A_hops]
             vu = tf.matmul(v, u_omega)
-            # [B, T, A]
-            vu = tf.reshape(vu, [-1, time_steps, attn_size])
-            # [B, A, T]
+            # [B, T, A_hops]
+            vu = tf.reshape(vu, [-1, time_steps, attn_hops])
+            # [B, A_hops, T]
             vu_transposed = tf.transpose(vu, [0, 2, 1])
-            # [B, A, T]
+            # [B, A_hops, T]
             alphas = tf.nn.softmax(vu_transposed, name="alphas", axis=2)
-            # [B, A, H]
+            # [B, A_hops, H]
             output = tf.matmul(alphas, encoded_input)
-            # [B, A * H]
+            # [B, A_hops * H]
             output = tf.layers.flatten(output)
 
             return output, alphas
 
     @staticmethod
-    def compute_frob_norm(attention_weights, attn_size):
+    def compute_frob_norm(attention_weights: tf.Tensor, attn_hops: int):
+        """Computes the Frobenius norm of the attention weights tensor.
+
+        Args:
+            attention_weights: The attention weights.
+            attn_hops: The number of attention hops
+
+        Returns:
+            The Frobenius norm of the attention weights tensor.
+
+        """
         attn_w_dot_product = tf.matmul(
             attention_weights, tf.transpose(attention_weights, [0, 2, 1])
         )
         identity_matrix = tf.reshape(
-            tf.tile(tf.eye(attn_size), [tf.shape(attention_weights)[0], 1]),
-            [-1, attn_size, attn_size],
+            tf.tile(tf.eye(attn_hops), [tf.shape(attention_weights)[0], 1]),
+            [-1, attn_hops, attn_hops],
         )
         return tf.reduce_sum(
             tf.square(
@@ -266,29 +271,23 @@ class Text2ImageMatchingModel:
         )
 
     def compute_loss(
-        self,
-        embedding_images: tf.Tensor,
-        embedding_texts: tf.Tensor,
-        margin: float,
-        weight_decay: float,
-        attn_size: float,
-        image_alphas: tf.Tensor,
-        text_alphas: tf.Tensor,
+        self, margin: float, attn_hops: int, frob_norm_pen: float
     ) -> tf.Tensor:
         """Computes the triplet loss.
 
         Args:
-            embedding_images: The embedded images.
-            embedding_texts: The embedded sentences.
             margin: The contrastive margin.
-            weight_decay: The L2 coefficient for the regularization constant.
+            attn_hops: The number of attention hops.
+            frob_norm_pen: The weight assigned to the Frob norm.
 
         Returns:
             The contrastive loss using the batch-all strategy.
 
         """
         with tf.variable_scope(name_or_scope="loss"):
-            scores = tf.matmul(embedding_images, embedding_texts, transpose_b=True)
+            scores = tf.matmul(
+                self.attended_images, self.attended_captions, transpose_b=True
+            )
             diagonal = tf.diag_part(scores)
 
             # compare every diagonal score to scores in its column
@@ -312,11 +311,15 @@ class Text2ImageMatchingModel:
                         if "bias" not in v.name
                     ]
                 )
-                * weight_decay
+                * self.weight_decay
             )
 
-            pen_image_alphas = self.compute_frob_norm(image_alphas, attn_size)
-            pen_text_alphas = self.compute_frob_norm(text_alphas, attn_size)
+            pen_image_alphas = (
+                self.compute_frob_norm(self.image_alphas, attn_hops) * frob_norm_pen
+            )
+            pen_text_alphas = (
+                self.compute_frob_norm(self.text_alphas, attn_hops) * frob_norm_pen
+            )
 
             return loss + l2 + pen_image_alphas + pen_text_alphas
 

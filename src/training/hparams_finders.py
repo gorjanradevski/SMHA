@@ -57,18 +57,22 @@ class BaseHparamsFinder(ABC):
         # Define the search space
         self.search_space = {
             "min_unk_sub": hp.choice("min_unk_sub", range(3, 10)),
-            "embed_size": hp.choice("embed_size", range(200, 500)),
+            "embed_size": hp.choice("embed_size", range(200, 400)),
             "layers": hp.choice("layers", range(1, 3)),
-            "rnn_hidden_size": hp.choice("rnn_hidden_size", range(128, 512)),
+            "rnn_hidden_size": hp.choice("rnn_hidden_size", range(128, 256)),
             "cell": hp.choice("cell", ["lstm", "gru"]),
-            "keep_prob": hp.uniform("keep_prob", 0.4, 1.0),
+            "keep_prob": hp.uniform("keep_prob", 0.5, 1.0),
             "weight_decay": hp.loguniform("wd", np.log(0.000_001), np.log(0.01)),
             "learning_rate": hp.loguniform(
                 "learning_rate", np.log(0.000_001), np.log(0.01)
             ),
             "opt": hp.choice("opt", ["adam", "sgd", "rmsprop"]),
             "margin": hp.uniform("margin", 0.01, 5),
-            "attn_size": hp.choice("attn_size", range(20, 100)),
+            "attn_size": hp.choice("attn_size", range(20, 50)),
+            "attn_hops": hp.choice("attn_hops", range(1, 50)),
+            "frob_norm_pen": hp.loguniform(
+                "frob_norm_pen", np.log(0.0001), np.log(3.0)
+            ),
             "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
         }
 
@@ -163,6 +167,8 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
         cell = args["cell"]
         layers = args["layers"]
         attn_size = args["attn_size"]
+        attn_hops = args["attn_hops"]
+        frob_norm_pen = args["frob_norm_pen"]
         opt = args["opt"]
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
@@ -207,6 +213,8 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
             cell,
             layers,
             attn_size,
+            attn_hops,
+            frob_norm_pen,
             opt,
             learning_rate,
             gradient_clip_val,

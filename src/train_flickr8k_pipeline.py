@@ -101,6 +101,8 @@ def train(
         hparams.cell,
         hparams.layers,
         hparams.attn_size,
+        hparams.attn_hops,
+        hparams.frob_norm_pen,
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
