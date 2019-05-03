@@ -80,7 +80,13 @@ class Text2ImageMatchingModel:
         logger.info("Attention graph created...")
         self.margin = margin
         self.loss = self.compute_loss(
-            self.attended_images, self.attended_captions, self.margin, self.weight_decay
+            self.attended_images,
+            self.attended_captions,
+            self.margin,
+            self.weight_decay,
+            attn_size,
+            self.image_alphas,
+            self.text_alphas,
         )
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
@@ -245,11 +251,29 @@ class Text2ImageMatchingModel:
             return output, alphas
 
     @staticmethod
+    def compute_frob_norm(attention_weights, attn_size):
+        attn_w_dot_product = tf.matmul(
+            attention_weights, tf.transpose(attention_weights, [0, 2, 1])
+        )
+        identity_matrix = tf.reshape(
+            tf.tile(tf.eye(attn_size), [tf.shape(attention_weights)[0], 1]),
+            [-1, attn_size, attn_size],
+        )
+        return tf.reduce_sum(
+            tf.square(
+                tf.norm(attn_w_dot_product - identity_matrix, axis=[-2, -1], ord="fro")
+            )
+        )
+
     def compute_loss(
+        self,
         embedding_images: tf.Tensor,
         embedding_texts: tf.Tensor,
         margin: float,
         weight_decay: float,
+        attn_size: float,
+        image_alphas: tf.Tensor,
+        text_alphas: tf.Tensor,
     ) -> tf.Tensor:
         """Computes the triplet loss.
 
@@ -291,7 +315,10 @@ class Text2ImageMatchingModel:
                 * weight_decay
             )
 
-            return loss + l2
+            pen_image_alphas = self.compute_frob_norm(image_alphas, attn_size)
+            pen_text_alphas = self.compute_frob_norm(text_alphas, attn_size)
+
+            return loss + l2 + pen_image_alphas + pen_text_alphas
 
     def apply_gradients_op(
         self,
