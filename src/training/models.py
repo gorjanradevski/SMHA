@@ -240,7 +240,7 @@ class Text2ImageMatchingModel:
             # [B, A, H]
             output = tf.matmul(alphas, encoded_input)
             # [B, A * H]
-            output = tf.reshape(output, [-1, attn_size * hidden_size])
+            output = tf.layers.flatten(output)
 
             return output, alphas
 
