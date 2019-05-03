@@ -86,37 +86,37 @@ class BaseHparamsFinder(ABC):
         """
         pass
 
-    def find_best(self, max_evals: int, hparams_path: str, trials_path: str) -> None:
-        try:
-            trials = pickle.load(open(trials_path, "rb"))
-            max_evals += len(trials.trials)
-            last_best = trials.best_trial["result"]["loss"]
-        except FileNotFoundError:
-            trials = Trials()
-            last_best = sys.maxsize
-        logger.info(f"Last best from previous iteration was: {last_best}")
-        best_hparams = space_eval(
-            self.search_space,
-            fmin(
-                self.objective,
+    def find_best(self, num_iters: int, hparams_path: str, trials_path: str) -> None:
+        for _ in range(num_iters):
+            try:
+                trials = pickle.load(open(trials_path, "rb"))
+                last_best = trials.best_trial["result"]["loss"]
+            except FileNotFoundError:
+                trials = Trials()
+                last_best = sys.maxsize
+            logger.info(f"Last best from previous iteration was: {last_best}")
+            best_hparams = space_eval(
                 self.search_space,
-                algo=tpe.suggest,
-                max_evals=max_evals,
-                show_progressbar=False,
-                trials=trials,
-            ),
-        )
-        # Dump Trials object always
-        with open(trials_path, "wb") as trials_file:
-            pickle.dump(trials, trials_file)
+                fmin(
+                    self.objective,
+                    self.search_space,
+                    algo=tpe.suggest,
+                    max_evals=len(trials.trials) + 1,
+                    show_progressbar=False,
+                    trials=trials,
+                ),
+            )
+            # Dump Trials object always
+            with open(trials_path, "wb") as trials_file:
+                pickle.dump(trials, trials_file)
 
-        # Dump hparams only if better result was achieved
-        if trials.best_trial["result"]["loss"] < last_best:
-            best_hparams["name"] = self.name
-            best_hparams["seed"] = self.seed
+            # Dump hparams only if better result was achieved
+            if trials.best_trial["result"]["loss"] < last_best:
+                best_hparams["name"] = self.name
+                best_hparams["seed"] = self.seed
 
-            with open(hparams_path, "w") as yaml_file:
-                YAML().dump(best_hparams, yaml_file)
+                with open(hparams_path, "w") as yaml_file:
+                    YAML().dump(best_hparams, yaml_file)
 
 
 class Flickr8kHparamsFinder(BaseHparamsFinder):
