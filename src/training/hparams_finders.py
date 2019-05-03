@@ -183,8 +183,8 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
         val_image_paths, val_captions, val_captions_lengths = dataset.get_data(
             self.val_imgs_file_path
         )
-        # The number of features at the output will be: rnn_hidden_size * 2
-        evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * 2)
+        # The number of features at the output will be: rnn_hidden_size * 2 * attn_hops
+        evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * 2 * attn_hops)
 
         # Resetting the default graph and setting the random seed
         tf.reset_default_graph()
