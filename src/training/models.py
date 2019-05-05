@@ -264,7 +264,7 @@ class Text2ImageMatchingModel:
             tf.tile(tf.eye(attn_hops), [tf.shape(attention_weights)[0], 1]),
             [-1, attn_hops, attn_hops],
         )
-        return tf.reduce_sum(
+        return tf.reduce_mean(
             tf.square(
                 tf.norm(attn_w_dot_product - identity_matrix, axis=[-2, -1], ord="fro")
             )
