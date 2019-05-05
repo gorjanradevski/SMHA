@@ -258,4 +258,8 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
                 if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
                     evaluator_val.update_best_image2text_recall_at_k(self.recall_at)
 
+        logger.info(
+            f"Current best image to text recall at K is: {-evaluator_val.best_image2text_recall_at_k}"
+        )
+
         return -evaluator_val.best_image2text_recall_at_k
