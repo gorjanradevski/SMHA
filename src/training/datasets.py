@@ -255,9 +255,9 @@ class ValCocoDataset(BaseCocoDataset):
         self.val_size = val_size
 
 
-class Flickr8kDataset:
+class FlickrDataset:
 
-    # Adapted for working with the Flickr8k dataset.
+    # Adapted for working with the Flickr8k and Flickr30k dataset.
     word_freq: Dict[str, int] = {}
     word2index: Dict[str, int] = {}
     index2word: Dict[int, str] = {}
@@ -320,23 +320,23 @@ class Flickr8kDataset:
         for captions_list in captions:
             for caption in captions_list:
                 for word in caption:
-                    if word not in Flickr8kDataset.word_freq.keys():
-                        Flickr8kDataset.word_freq[word] = 0
-                    Flickr8kDataset.word_freq[word] += 1
+                    if word not in FlickrDataset.word_freq.keys():
+                        FlickrDataset.word_freq[word] = 0
+                    FlickrDataset.word_freq[word] += 1
         index = 2
-        Flickr8kDataset.word2index = {"<pad>": PAD_ID, "<unk>": UNK_ID}
+        FlickrDataset.word2index = {"<pad>": PAD_ID, "<unk>": UNK_ID}
         for captions_list in captions:
             for caption in captions_list:
                 for word in caption:
                     if (
-                        word not in Flickr8kDataset.word2index.keys()
-                        and Flickr8kDataset.word_freq[word] >= min_unk_sub
+                        word not in FlickrDataset.word2index.keys()
+                        and FlickrDataset.word_freq[word] >= min_unk_sub
                     ):
-                        Flickr8kDataset.word2index[word] = index
+                        FlickrDataset.word2index[word] = index
                         index += 1
 
-        Flickr8kDataset.index2word = dict(
-            zip(Flickr8kDataset.word2index.values(), Flickr8kDataset.word2index.keys())
+        FlickrDataset.index2word = dict(
+            zip(FlickrDataset.word2index.values(), FlickrDataset.word2index.keys())
         )
 
     @staticmethod
@@ -345,8 +345,7 @@ class Flickr8kDataset:
         img_path_caption: Dict[str, List[List[str]]],
         images_dir_path: str,
     ):
-        """Returns the image paths, the captions, the lengths of the captions and a
-        distinct label for each quintuple.
+        """Returns the image paths, the captions and the lengths of the captions.
 
         Args:
             imgs_file_path: A path to a file where all the images belonging to the
@@ -365,14 +364,16 @@ class Flickr8kDataset:
             for image_name in file:
                 # Remove the newline character at the end
                 image_name = image_name[:-1]
+                # If there is no specified codec in the name of the image append jpg
+                if not image_name.endswith(".jpg"):
+                    image_name += ".jpg"
                 for i in range(5):
                     image_paths.append(os.path.join(images_dir_path, image_name))
-                    # Append the same label for each image and the 5 sentences
                     # Must wrap with a list so that the rank will be the same as the
                     # captions
                     indexed_caption = [
-                        Flickr8kDataset.word2index[word]
-                        if word in Flickr8kDataset.word2index.keys()
+                        FlickrDataset.word2index[word]
+                        if word in FlickrDataset.word2index.keys()
                         else 1
                         for word in img_path_caption[image_name][i]
                     ]

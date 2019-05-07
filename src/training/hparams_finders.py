@@ -11,7 +11,7 @@ import logging
 import pickle
 import sys
 
-from training.datasets import Flickr8kDataset, get_vocab_size
+from training.datasets import FlickrDataset, get_vocab_size
 from training.models import Text2ImageMatchingModel
 from training.loaders import TrainValLoader
 from training.evaluators import Evaluator
@@ -123,7 +123,7 @@ class BaseHparamsFinder(ABC):
                     YAML().dump(best_hparams, yaml_file)
 
 
-class Flickr8kHparamsFinder(BaseHparamsFinder):
+class FlickrHparamsFinder(BaseHparamsFinder):
     def __init__(
         self,
         images_path: str,
@@ -175,7 +175,7 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
         keep_prob = args["keep_prob"]
         weight_decay = args["weight_decay"]
 
-        dataset = Flickr8kDataset(self.images_path, self.texts_path, min_unk_sub)
+        dataset = FlickrDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
             self.train_imgs_file_path
         )
@@ -208,7 +208,7 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
             captions_lengths,
             margin,
             rnn_hidden_size,
-            get_vocab_size(Flickr8kDataset),
+            get_vocab_size(FlickrDataset),
             embed_size,
             cell,
             layers,
@@ -256,7 +256,7 @@ class Flickr8kHparamsFinder(BaseHparamsFinder):
                     pass
 
                 if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
-                    evaluator_val.update_best_image2text_recall_at_k(self.recall_at)
+                    evaluator_val.update_best_image2text_recall_at_k()
 
         logger.info(
             f"Current best image to text recall at K is: {-evaluator_val.best_image2text_recall_at_k}"

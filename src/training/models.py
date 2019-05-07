@@ -273,7 +273,13 @@ class Text2ImageMatchingModel:
     def compute_loss(
         self, margin: float, attn_hops: int, frob_norm_pen: float
     ) -> tf.Tensor:
-        """Computes the triplet loss.
+        """Computes the contrastive loss.
+
+        1. Computes the contrastive loss between the image and text embeddings.
+        2. Computes the Frob norm of the of the AA^T - I (image embeddings).
+        3. Computes the Frob norm of the of the AA^T - I (text embeddings).
+        4. Computes the L2 norm of the trainable weight matrices.
+        5. Adds all together to compute the loss.
 
         Args:
             margin: The contrastive margin.

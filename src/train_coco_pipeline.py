@@ -168,21 +168,8 @@ def train(
             except tf.errors.OutOfRangeError:
                 pass
 
-            # Write validation summaries
-            val_loss_summary, val_recall_at_k = sess.run(
-                [model.val_loss_summary, model.val_recall_at_k_summary],
-                feed_dict={
-                    model.val_loss_ph: evaluator_val.loss,
-                    model.val_recall_at_k_ph: evaluator_val.image2text_recall_at_k(
-                        recall_at
-                    ),
-                },
-            )
-            model.add_summary(sess, val_loss_summary)
-            model.add_summary(sess, val_recall_at_k)
-
             if evaluator_val.is_best_image2text_recall_at_k(recall_at):
-                evaluator_val.update_best_image2text_recall_at_k(recall_at)
+                evaluator_val.update_best_image2text_recall_at_k()
                 logger.info("=============================")
                 logger.info(
                     f"Found new best on epoch {e+1} with recall at {recall_at}: "
@@ -190,6 +177,17 @@ def train(
                 )
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
+
+            # Write validation summaries
+            val_loss_summary, val_recall_at_k = sess.run(
+                [model.val_loss_summary, model.val_recall_at_k_summary],
+                feed_dict={
+                    model.val_loss_ph: evaluator_val.loss,
+                    model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k,
+                },
+            )
+            model.add_summary(sess, val_loss_summary)
+            model.add_summary(sess, val_recall_at_k)
 
 
 def main():
@@ -220,7 +218,9 @@ def parse_args():
         Arguments
 
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Performs training on the Microsoft COCO dataset."
+    )
     parser.add_argument(
         "--hparams_path",
         type=str,

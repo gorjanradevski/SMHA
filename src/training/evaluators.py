@@ -11,7 +11,9 @@ class Evaluator:
         self.loss = 0.0
         self.best_loss = sys.maxsize
         self.best_image2text_recall_at_k = -1.0
+        self.cur_image2text_recall_at_k = -1.0
         self.best_text2image_recall_at_k = -1.0
+        self.cur_text2image_recall_at_k = -1.0
         self.index_update = 0
         self.num_samples = num_samples
         self.num_features = num_features
@@ -23,6 +25,8 @@ class Evaluator:
         self.index_update = 0
         self.embedded_images = np.zeros((self.num_samples, self.num_features))
         self.embedded_captions = np.zeros((self.num_samples, self.num_features))
+        self.cur_text2image_recall_at_k = -1
+        self.cur_image2text_recall_at_k = -1.0
 
     def update_metrics(self, loss: float) -> None:
         self.loss += loss
@@ -48,20 +52,22 @@ class Evaluator:
         self.best_loss = self.loss
 
     def is_best_image2text_recall_at_k(self, k: int) -> bool:
-        if self.image2text_recall_at_k(k) > self.best_image2text_recall_at_k:
+        self.cur_image2text_recall_at_k = self.image2text_recall_at_k(k)
+        if self.cur_image2text_recall_at_k > self.best_image2text_recall_at_k:
             return True
         return False
 
-    def update_best_image2text_recall_at_k(self, k: int):
-        self.best_image2text_recall_at_k = self.image2text_recall_at_k(k)
+    def update_best_image2text_recall_at_k(self):
+        self.best_image2text_recall_at_k = self.cur_image2text_recall_at_k
 
     def is_best_text2image_recall_at_k(self, k: int) -> bool:
-        if self.text2image_recall_at_k(k) > self.best_text2image_recall_at_k:
+        self.cur_text2image_recall_at_k = self.text2image_recall_at_k(k)
+        if self.cur_text2image_recall_at_k > self.best_text2image_recall_at_k:
             return True
         return False
 
-    def update_best_text2image_recall_at_k(self, k: int):
-        self.best_text2image_recall_at_k = self.text2image_recall_at_k(k)
+    def update_best_text2image_recall_at_k(self):
+        self.best_text2image_recall_at_k = self.cur_text2image_recall_at_k
 
     def image2text_recall_at_k(self, k: int) -> float:
         """Computes the recall at K when doing image to text retrieval and updates the

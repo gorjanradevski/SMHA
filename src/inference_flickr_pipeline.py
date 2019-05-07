@@ -4,7 +4,7 @@ import logging
 from tqdm import tqdm
 import os
 
-from training.datasets import Flickr8kDataset, get_vocab_size
+from training.datasets import FlickrDataset, get_vocab_size
 from training.hyperparameters import YParams
 from training.loaders import TestLoader
 from training.models import Text2ImageMatchingModel
@@ -44,7 +44,7 @@ def inference(
 
     """
     hparams = YParams(hparams_path)
-    dataset = Flickr8kDataset(images_path, texts_path, hparams.min_unk_sub)
+    dataset = FlickrDataset(images_path, texts_path, hparams.min_unk_sub)
     # Getting the vocabulary size of the train dataset
     test_image_paths, test_captions, test_captions_lengths = dataset.get_data(
         test_imgs_file_path
@@ -73,14 +73,15 @@ def inference(
         images,
         captions,
         captions_lengths,
-        hparams.finetune,
         hparams.margin,
         hparams.rnn_hidden_size,
-        get_vocab_size(Flickr8kDataset),
+        get_vocab_size(FlickrDataset),
         hparams.embed_size,
         hparams.cell,
         hparams.layers,
         hparams.attn_size,
+        hparams.attn_hops,
+        hparams.frob_norm_pen,
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
@@ -137,7 +138,10 @@ def parse_args():
         Arguments
 
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        "Performs inference on the Flickr8k and Flickr30k datasets."
+        "Defaults to the Flickr8k dataset."
+    )
     parser.add_argument(
         "--hparams_path",
         type=str,
@@ -147,7 +151,7 @@ def parse_args():
     parser.add_argument(
         "--images_path",
         type=str,
-        default="data/Flickr8k_dataset/Flicker8k_Dataset",
+        default="data/Flickr8k_dataset/Flickr8k_Dataset",
         help="Path where all images are.",
     )
     parser.add_argument(

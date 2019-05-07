@@ -1,7 +1,7 @@
 import argparse
 import os
 import tensorflow as tf
-from training.hparams_finders import Flickr8kHparamsFinder
+from training.hparams_finders import FlickrHparamsFinder
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 tf.logging.set_verbosity(tf.logging.ERROR)
@@ -42,7 +42,7 @@ def optimize(
         None
 
     """
-    hparams_finder = Flickr8kHparamsFinder(
+    hparams_finder = FlickrHparamsFinder(
         images_path,
         texts_path,
         train_imgs_file_path,
@@ -83,12 +83,15 @@ def parse_args():
         Arguments
 
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Searches for the best model parameters on the Flickr8k and"
+        "Flickr30k datasets. Defaults to the Flickr8k dataset."
+    )
 
     parser.add_argument(
         "--images_path",
         type=str,
-        default="data/Flickr8k_dataset/Flicker8k_Dataset",
+        default="data/Flickr8k_dataset/Flickr8k_Dataset",
         help="Path where all images are.",
     )
     parser.add_argument(
