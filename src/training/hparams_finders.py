@@ -235,6 +235,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                             feed_dict={
                                 model.keep_prob: keep_prob,
                                 model.weight_decay: weight_decay,
+                                model.frob_norm_pen: frob_norm_pen,
                             },
                         )
                 except tf.errors.OutOfRangeError:

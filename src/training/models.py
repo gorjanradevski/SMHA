@@ -29,7 +29,6 @@ class Text2ImageMatchingModel:
         num_layers: int,
         attn_size: int,
         attn_hops: int,
-        frob_norm_pen: float,
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
@@ -56,6 +55,9 @@ class Text2ImageMatchingModel:
         # Create dropout and weight decay placeholder
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
+        self.frob_norm_pen = tf.placeholder_with_default(
+            0.0, None, name="frob_norm_pen"
+        )
         # Build model
         self.image_encoded = self.image_encoder_graph(self.images, rnn_hidden_size)
         logger.info("Image encoder graph created...")
@@ -78,7 +80,7 @@ class Text2ImageMatchingModel:
             attn_size, attn_hops, self.text_encoded
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_hops, frob_norm_pen)
+        self.loss = self.compute_loss(margin, attn_hops)
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
@@ -262,9 +264,7 @@ class Text2ImageMatchingModel:
             )
         )
 
-    def compute_loss(
-        self, margin: float, attn_hops: int, frob_norm_pen: float
-    ) -> tf.Tensor:
+    def compute_loss(self, margin: float, attn_hops: int) -> tf.Tensor:
         """Computes the contrastive loss.
 
         1. Computes the contrastive loss between the image and text embeddings.
@@ -276,7 +276,6 @@ class Text2ImageMatchingModel:
         Args:
             margin: The contrastive margin.
             attn_hops: The number of attention hops.
-            frob_norm_pen: The weight assigned to the Frob norm.
 
         Returns:
             The contrastive loss using the batch-all strategy.
@@ -313,10 +312,11 @@ class Text2ImageMatchingModel:
             )
 
             pen_image_alphas = (
-                self.compute_frob_norm(self.image_alphas, attn_hops) * frob_norm_pen
+                self.compute_frob_norm(self.image_alphas, attn_hops)
+                * self.frob_norm_pen
             )
             pen_text_alphas = (
-                self.compute_frob_norm(self.text_alphas, attn_hops) * frob_norm_pen
+                self.compute_frob_norm(self.text_alphas, attn_hops) * self.frob_norm_pen
             )
 
             return loss + l2 + pen_image_alphas + pen_text_alphas

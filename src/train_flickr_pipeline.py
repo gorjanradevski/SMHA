@@ -101,7 +101,6 @@ def train(
         hparams.layers,
         hparams.attn_size,
         hparams.attn_hops,
-        hparams.frob_norm_pen,
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
@@ -132,6 +131,7 @@ def train(
                             feed_dict={
                                 model.keep_prob: hparams.keep_prob,
                                 model.weight_decay: hparams.weight_decay,
+                                model.frob_norm_pen: hparams.frob_norm_pen,
                             },
                         )
                         evaluator_train.update_metrics(loss)
