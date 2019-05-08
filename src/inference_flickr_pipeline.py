@@ -69,7 +69,6 @@ def inference(
     logger.info("Loader created...")
 
     model = Text2ImageMatchingModel(
-        hparams.seed,
         images,
         captions,
         captions_lengths,

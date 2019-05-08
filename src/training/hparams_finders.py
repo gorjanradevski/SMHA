@@ -202,7 +202,6 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         )
         images, captions, captions_lengths = loader.get_next()
         model = Text2ImageMatchingModel(
-            self.seed,
             images,
             captions,
             captions_lengths,

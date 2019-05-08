@@ -117,7 +117,6 @@ def test_image_encoder(input_images, rnn_hidden_size):
 
 
 def test_text_encoder(
-    seed,
     captions,
     captions_len,
     vocab_size,
@@ -129,7 +128,6 @@ def test_text_encoder(
 ):
     tf.reset_default_graph()
     text_encoded = Text2ImageMatchingModel.text_encoder_graph(
-        seed,
         captions,
         captions_len,
         vocab_size,
@@ -163,7 +161,6 @@ def test_joint_attention(rnn_hidden_size, attn_size, attn_hops, encoded_input):
 
 
 def test_attended_image_text_shape(
-    seed,
     input_images,
     captions,
     captions_len,
@@ -182,7 +179,6 @@ def test_attended_image_text_shape(
 ):
     tf.reset_default_graph()
     model = Text2ImageMatchingModel(
-        seed,
         input_images,
         captions,
         captions_len,

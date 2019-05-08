@@ -21,7 +21,7 @@ def train(
     images_path: str,
     texts_path: str,
     train_imgs_file_path: str,
-    val_imgs_file_path,
+    val_imgs_file_path: str,
     epochs: int,
     batch_size: int,
     prefetch_size: int,
@@ -90,7 +90,6 @@ def train(
     logger.info("Loader created...")
 
     model = Text2ImageMatchingModel(
-        hparams.seed,
         images,
         captions,
         captions_lengths,
@@ -141,13 +140,6 @@ def train(
             except tf.errors.OutOfRangeError:
                 pass
 
-            # Write training summaries
-            train_loss_summary = sess.run(
-                model.train_loss_summary,
-                feed_dict={model.train_loss_ph: evaluator_train.loss},
-            )
-            model.add_summary(sess, train_loss_summary)
-
             # Initialize iterator with validation data
             sess.run(loader.val_init)
             try:
@@ -178,6 +170,13 @@ def train(
                 )
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
+
+            # Write training summaries
+            train_loss_summary = sess.run(
+                model.train_loss_summary,
+                feed_dict={model.train_loss_ph: evaluator_train.loss},
+            )
+            model.add_summary(sess, train_loss_summary)
 
             # Write validation summaries
             val_loss_summary, val_recall_at_k = sess.run(

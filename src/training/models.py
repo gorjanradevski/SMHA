@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 class Text2ImageMatchingModel:
     def __init__(
         self,
-        seed: int,
         images: tf.Tensor,
         captions: tf.Tensor,
         captions_len: tf.Tensor,
@@ -61,7 +60,6 @@ class Text2ImageMatchingModel:
         self.image_encoded = self.image_encoder_graph(self.images, rnn_hidden_size)
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
-            seed,
             self.captions,
             self.captions_len,
             vocab_size,
@@ -143,7 +141,6 @@ class Text2ImageMatchingModel:
 
     @staticmethod
     def text_encoder_graph(
-        seed: int,
         captions: tf.Tensor,
         captions_len: tf.Tensor,
         vocab_size: int,
@@ -156,7 +153,6 @@ class Text2ImageMatchingModel:
         """Encodes the text it gets as input using a bidirectional rnn.
 
         Args:
-            seed: The random seed.
             captions: The inputs.
             captions_len: The length of the inputs.
             vocab_size: The size of the vocabulary.
@@ -178,12 +174,8 @@ class Text2ImageMatchingModel:
                 name="embeddings",
             )
             inputs = tf.nn.embedding_lookup(embeddings, captions)
-            cell_fw = cell_factory(
-                seed, cell_type, rnn_hidden_size, num_layers, keep_prob
-            )
-            cell_bw = cell_factory(
-                seed, cell_type, rnn_hidden_size, num_layers, keep_prob
-            )
+            cell_fw = cell_factory(cell_type, rnn_hidden_size, num_layers, keep_prob)
+            cell_bw = cell_factory(cell_type, rnn_hidden_size, num_layers, keep_prob)
             (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
                 cell_fw, cell_bw, inputs, sequence_length=captions_len, dtype=tf.float32
             )
