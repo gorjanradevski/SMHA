@@ -110,7 +110,7 @@ class Text2ImageMatchingModel:
         with variable_scope.variable_scope("vgg_16", "vgg_16", [images]) as sc:
             end_points_collection = sc.original_name_scope + "_end_points"
             with arg_scope(
-                [layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
+                [layers.conv2d, layers_lib.max_pool2d],
                 outputs_collections=end_points_collection,
             ):
                 net = layers_lib.repeat(
@@ -165,7 +165,7 @@ class Text2ImageMatchingModel:
             keep_prob: The dropout probability (1.0 means keep everything)
 
         Returns:
-            The encoded the text.
+            The encoded text.
 
         """
         with tf.variable_scope("text_encoder"):
@@ -181,7 +181,8 @@ class Text2ImageMatchingModel:
             (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
                 cell_fw, cell_bw, inputs, sequence_length=captions_len, dtype=tf.float32
             )
-        return tf.concat([output_fw, output_bw], axis=2)
+
+            return tf.concat([output_fw, output_bw], axis=2)
 
     @staticmethod
     def join_attention_graph(attn_size: int, attn_hops: int, encoded_input: tf.Tensor):
