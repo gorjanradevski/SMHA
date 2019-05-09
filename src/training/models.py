@@ -170,8 +170,9 @@ class Text2ImageMatchingModel:
         """
         with tf.variable_scope("text_encoder"):
             embeddings = tf.Variable(
-                tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
-                dtype=tf.float32,
+                tf.random_uniform(
+                    [vocab_size, embedding_size], -1.0, 1.0, dtype=tf.float32
+                ),
                 trainable=True,
                 name="embeddings",
             )
@@ -210,14 +211,19 @@ class Text2ImageMatchingModel:
             # Trainable parameters
             w_omega = tf.get_variable(
                 name="w_omega",
-                initializer=tf.random_normal([hidden_size, attn_size], stddev=0.1),
+                initializer=tf.random_normal(
+                    [hidden_size, attn_size], stddev=0.1, dtype=tf.float32
+                ),
             )
             b_omega = tf.get_variable(
-                name="b_omega", initializer=tf.random_normal([attn_size], stddev=0.1)
+                name="b_omega",
+                initializer=tf.random_normal([attn_size], stddev=0.1, dtype=tf.float32),
             )
             u_omega = tf.get_variable(
                 name="u_omega",
-                initializer=tf.random_normal([attn_size, attn_hops], stddev=0.1),
+                initializer=tf.random_normal(
+                    [attn_size, attn_hops], stddev=0.1, dtype=tf.float32
+                ),
             )
 
             # Apply attention

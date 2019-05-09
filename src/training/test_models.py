@@ -12,7 +12,14 @@ def rnn_hidden_size():
 
 
 @pytest.fixture
+def input_images_image_encoder():
+    np.random.seed(42)
+    return np.random.rand(50, 224, 224, 3).astype(np.float32)
+
+
+@pytest.fixture
 def input_images():
+    np.random.seed(42)
     return np.random.rand(3, 224, 224, 3).astype(np.float32)
 
 
@@ -29,11 +36,6 @@ def captions():
 @pytest.fixture
 def captions_len():
     return np.array([5, 2, 4])
-
-
-@pytest.fixture
-def labels():
-    return np.array([1, 1, 2])
 
 
 @pytest.fixture
@@ -73,6 +75,7 @@ def attn_size():
 
 @pytest.fixture
 def encoded_input():
+    np.random.seed(42)
     return np.random.rand(5, 10, 100).astype(np.float32)
 
 
@@ -101,19 +104,39 @@ def frob_norm_pen():
     return 1
 
 
-def test_image_encoder(input_images, rnn_hidden_size):
+def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
     tf.reset_default_graph()
-    input_layer = tf.placeholder(dtype=tf.float32, shape=[3, 224, 224, 3])
+    input_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
     image_encoded = Text2ImageMatchingModel.image_encoder_graph(
         input_layer, rnn_hidden_size
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         output_shape = sess.run(
-            image_encoded, feed_dict={input_layer: input_images}
+            image_encoded, feed_dict={input_layer: input_images_image_encoder}
         ).shape
-    assert output_shape[0] == 3
+    assert output_shape[0] == 50
     assert output_shape[2] == 2 * rnn_hidden_size
+
+
+def test_image_encoder_batch_size_invariance(
+    input_images_image_encoder, rnn_hidden_size
+):
+    tf.reset_default_graph()
+    input_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
+    image_encoded = Text2ImageMatchingModel.image_encoder_graph(
+        input_layer, rnn_hidden_size
+    )
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        output_5 = sess.run(
+            image_encoded, feed_dict={input_layer: input_images_image_encoder[:5]}
+        )
+        output_50 = sess.run(
+            image_encoded, feed_dict={input_layer: input_images_image_encoder}
+        )
+
+        np.testing.assert_equal(output_50[:5], output_5)
 
 
 def test_text_encoder(

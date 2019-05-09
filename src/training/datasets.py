@@ -302,7 +302,7 @@ class FlickrDataset:
     ) -> None:
         """Sets up the class variables word_freq, word2index and index2word.
 
-        1. Computes the word frequencies and sets the class variable with the value.
+        1. Computes the word frequencies and sets the class variable with the values.
         The class variable is a dictionary where the key is the word and the value is
         how many times that word occurs in the dataset.
         2. Creates a dict where each word is mapped to an index.

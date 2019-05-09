@@ -8,11 +8,11 @@ from training.loaders import TrainValLoader, TestLoader
 @pytest.fixture
 def train_image_paths():
     return [
-        "data/testing_assets/images_train/COCO_val2014_000000000042.jpg",
-        "data/testing_assets/images_train/COCO_val2014_000000000073.jpg",
-        "data/testing_assets/images_train/COCO_val2014_000000000074.jpg",
-        "data/testing_assets/images_train/COCO_val2014_000000000133.jpg",
-        "data/testing_assets/images_train/COCO_val2014_000000000136.jpg",
+        "data/testing_assets/coco_images_train/COCO_val2014_000000000042.jpg",
+        "data/testing_assets/coco_images_train/COCO_val2014_000000000073.jpg",
+        "data/testing_assets/coco_images_train/COCO_val2014_000000000074.jpg",
+        "data/testing_assets/coco_images_train/COCO_val2014_000000000133.jpg",
+        "data/testing_assets/coco_images_train/COCO_val2014_000000000136.jpg",
     ]
 
 
@@ -29,9 +29,9 @@ def train_captions_lengths():
 @pytest.fixture
 def val_image_paths():
     return [
-        "data/testing_assets/images_val/COCO_val2014_000000000042.jpg",
-        "data/testing_assets/images_val/COCO_val2014_000000000073.jpg",
-        "data/testing_assets/images_val/COCO_val2014_000000000074.jpg",
+        "data/testing_assets/coco_images_val/COCO_val2014_000000000042.jpg",
+        "data/testing_assets/coco_images_val/COCO_val2014_000000000073.jpg",
+        "data/testing_assets/coco_images_val/COCO_val2014_000000000074.jpg",
     ]
 
 
@@ -60,7 +60,7 @@ def prefetch_size():
     return 2
 
 
-def test_train_val_loader(
+def test_train_val_loader_shapes(
     train_image_paths,
     train_captions,
     train_captions_lengths,
@@ -116,6 +116,100 @@ def test_train_val_loader(
                         assert caption.shape[0] == num_tokens_batch
                     for caption, length in zip(captions_batch, captions_lengths_batch):
                         assert np.count_nonzero(caption) == length
+            except tf.errors.OutOfRangeError:
+                pass
+
+
+def test_train_val_loader_batch_size_invariance_val(
+    train_image_paths,
+    train_captions,
+    train_captions_lengths,
+    val_image_paths,
+    val_captions,
+    val_captions_lengths,
+    epochs,
+    prefetch_size,
+):
+
+    tf.reset_default_graph()
+    loader_5 = TrainValLoader(
+        train_image_paths,
+        train_captions,
+        train_captions_lengths,
+        val_image_paths,
+        val_captions,
+        val_captions_lengths,
+        5,
+        prefetch_size,
+    )
+    images, captions, captions_lengths = loader_5.get_next()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        sess.run(loader_5.val_init)
+        images_val_5, captions_val_5, captions_val_lengths_5 = sess.run(
+            [images, captions, captions_lengths]
+        )
+
+    tf.reset_default_graph()
+    loader_3 = TrainValLoader(
+        train_image_paths,
+        train_captions,
+        train_captions_lengths,
+        val_image_paths,
+        val_captions,
+        val_captions_lengths,
+        3,
+        prefetch_size,
+    )
+    images, captions, captions_lengths = loader_3.get_next()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        sess.run(loader_3.val_init)
+        images_val_3, captions_val_3, captions_val_lengths_3 = sess.run(
+            [images, captions, captions_lengths]
+        )
+
+    np.testing.assert_equal(images_val_5[:3], images_val_3)
+    np.testing.assert_equal(captions_val_lengths_5[:3], captions_val_lengths_3)
+    max_len_3 = max(len(l) for l in captions_val_3)
+    np.testing.assert_equal(captions_val_5[:3, :max_len_3], captions_val_3)
+
+
+def test_train_val_loader_all_elements_val_taken(
+    train_image_paths,
+    train_captions,
+    train_captions_lengths,
+    val_image_paths,
+    val_captions,
+    val_captions_lengths,
+):
+    for batch_size in range(1, len(val_captions)):
+        tf.reset_default_graph()
+        loader = TrainValLoader(
+            train_image_paths,
+            train_captions,
+            train_captions_lengths,
+            val_image_paths,
+            val_captions,
+            val_captions_lengths,
+            batch_size,
+            1,
+        )
+        images, captions, captions_lengths = loader.get_next()
+        index = 0
+        with tf.Session() as sess:
+            sess.run(tf.global_variables_initializer())
+            sess.run(loader.val_init)
+            try:
+                while True:
+                    batch_caps, batch_lengths = sess.run([captions, captions_lengths])
+                    for caption, length, val_cap in zip(
+                        batch_caps,
+                        batch_lengths,
+                        val_captions[index : index + batch_size],
+                    ):
+                        np.testing.assert_array_equal(caption[:length], val_cap)
+                    index += len(batch_caps)
             except tf.errors.OutOfRangeError:
                 pass
 

@@ -5,7 +5,7 @@ from training.evaluators import Evaluator
 
 @pytest.fixture
 def num_samples():
-    return 15
+    return 50
 
 
 @pytest.fixture
@@ -19,51 +19,15 @@ def losses():
 
 
 @pytest.fixture
-def embedded_captions_p1():
-    np.random.seed(42)
-    return np.random.rand(15, 6)[:5, :]
-
-
-@pytest.fixture
-def embedded_captions_p2():
-    np.random.seed(42)
-    return np.random.rand(15, 6)[5:12, :]
-
-
-@pytest.fixture
-def embedded_captions_p3():
-    np.random.seed(42)
-    return np.random.rand(15, 6)[12:, :]
-
-
-@pytest.fixture
 def embedded_captions():
     np.random.seed(42)
-    return np.random.rand(15, 6)
-
-
-@pytest.fixture
-def embedded_images_p1():
-    np.random.seed(40)
-    return np.random.rand(15, 6)[:5, :]
-
-
-@pytest.fixture
-def embedded_images_p2():
-    np.random.seed(40)
-    return np.random.rand(15, 6)[5:12, :]
-
-
-@pytest.fixture
-def embedded_images_p3():
-    np.random.seed(40)
-    return np.random.rand(15, 6)[12:, :]
+    return np.random.rand(50, 6)
 
 
 @pytest.fixture
 def embedded_images():
     np.random.seed(40)
-    return np.random.rand(15, 6)
+    return np.random.rand(50, 6)
 
 
 def test_loss_computation(num_samples, num_features, losses):
@@ -78,22 +42,15 @@ def test_loss_computation(num_samples, num_features, losses):
     assert evaluator.best_loss == 0.8
 
 
-def test_embedded_update(
-    embedded_images_p1,
-    embedded_images_p2,
-    embedded_images_p3,
-    embedded_captions_p1,
-    embedded_captions_p2,
-    embedded_captions_p3,
-    embedded_captions,
-    embedded_images,
-    num_samples,
-    num_features,
-):
+def test_embedded_update(embedded_captions, embedded_images, num_samples, num_features):
     evaluator = Evaluator(num_samples, num_features)
-    evaluator.update_embeddings(embedded_images_p1, embedded_captions_p1)
-    evaluator.update_embeddings(embedded_images_p2, embedded_captions_p2)
-    evaluator.update_embeddings(embedded_images_p3, embedded_captions_p3)
+    evaluator.update_embeddings(embedded_images[:9], embedded_captions[:9])
+    evaluator.update_embeddings(embedded_images[9:13], embedded_captions[9:13])
+    evaluator.update_embeddings(embedded_images[13:27], embedded_captions[13:27])
+    evaluator.update_embeddings(embedded_images[27:39], embedded_captions[27:39])
+    evaluator.update_embeddings(embedded_images[39:43], embedded_captions[39:43])
+    evaluator.update_embeddings(embedded_images[43:49], embedded_captions[43:49])
+    evaluator.update_embeddings(embedded_images[49:], embedded_captions[49:])
     np.testing.assert_equal(embedded_images, evaluator.embedded_images)
     np.testing.assert_equal(embedded_captions, evaluator.embedded_captions)
 
