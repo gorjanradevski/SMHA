@@ -299,7 +299,7 @@ class Text2ImageMatchingModel:
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-            loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
+            loss = tf.reduce_mean(cost_s) + tf.reduce_mean(cost_im)
 
             l2 = (
                 tf.add_n(

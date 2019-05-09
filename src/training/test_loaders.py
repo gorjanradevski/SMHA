@@ -60,7 +60,7 @@ def prefetch_size():
     return 2
 
 
-def test_train_val_loader(
+def test_train_val_loader_shapes(
     train_image_paths,
     train_captions,
     train_captions_lengths,
@@ -118,6 +118,61 @@ def test_train_val_loader(
                         assert np.count_nonzero(caption) == length
             except tf.errors.OutOfRangeError:
                 pass
+
+
+def test_train_val_loader_batch_size_invariance_val(
+    train_image_paths,
+    train_captions,
+    train_captions_lengths,
+    val_image_paths,
+    val_captions,
+    val_captions_lengths,
+    epochs,
+    prefetch_size,
+):
+
+    tf.reset_default_graph()
+    loader_5 = TrainValLoader(
+        train_image_paths,
+        train_captions,
+        train_captions_lengths,
+        val_image_paths,
+        val_captions,
+        val_captions_lengths,
+        5,
+        prefetch_size,
+    )
+    images, captions, captions_lengths = loader_5.get_next()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        sess.run(loader_5.val_init)
+        images_val_5, captions_val_5, captions_val_lengths_5 = sess.run(
+            [images, captions, captions_lengths]
+        )
+
+    tf.reset_default_graph()
+    loader_3 = TrainValLoader(
+        train_image_paths,
+        train_captions,
+        train_captions_lengths,
+        val_image_paths,
+        val_captions,
+        val_captions_lengths,
+        3,
+        prefetch_size,
+    )
+    images, captions, captions_lengths = loader_3.get_next()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        sess.run(loader_3.val_init)
+        images_val_3, captions_val_3, captions_val_lengths_3 = sess.run(
+            [images, captions, captions_lengths]
+        )
+
+    np.testing.assert_equal(images_val_5[:3], images_val_3)
+    np.testing.assert_equal(captions_val_lengths_5[:3], captions_val_lengths_3)
+    max_len_3 = max(len(l) for l in captions_val_3)
+    np.testing.assert_equal(captions_val_5[:3, :max_len_3], captions_val_3)
 
 
 def test_test_loader(
