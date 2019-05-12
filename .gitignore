@@ -3,6 +3,7 @@
 /data/MicrosoftCoco_dataset/
 /data/Flickr30k_dataset/
 /data/Flickr8k_dataset/
+/data/Pascal_sentences_dataset
 /notebooks
 /logs
 /.idea
