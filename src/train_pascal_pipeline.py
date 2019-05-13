@@ -235,7 +235,7 @@ def parse_args():
     )
     parser.add_argument(
         "--val_size",
-        type=int,
+        type=float,
         default=0.2,
         help="The percentage of images per category to include in the validation set.",
     )

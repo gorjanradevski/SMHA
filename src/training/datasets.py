@@ -532,12 +532,12 @@ class PascalSentencesDataset:
                         for word in caption
                     ]
                     if data_type == "train":
-                        if v < data_size:
+                        if v >= data_size:
                             image_paths.append(image_path)
                             captions.append(indexed_caption)
                             lengths.append([len(caption)])
                     elif data_type == "val":
-                        if v >= data_size:
+                        if v < data_size:
                             image_paths.append(image_path)
                             captions.append(indexed_caption)
                             lengths.append([len(caption)])
@@ -546,7 +546,7 @@ class PascalSentencesDataset:
 
     def get_train_data(self, size):
         img_paths, cap, lengths = self.get_data_wrapper(
-            self.category_image_path_captions, size, "train"
+            self.category_image_path_captions, 1 - size, "train"
         )
 
         return img_paths, cap, lengths

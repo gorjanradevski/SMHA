@@ -316,7 +316,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = dataset.get_train_data(
-            self.val_size
+            1 - self.val_size
         )
         # Getting the vocabulary size of the train dataset
         val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data(
