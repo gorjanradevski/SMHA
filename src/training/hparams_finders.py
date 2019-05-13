@@ -11,7 +11,7 @@ import logging
 import pickle
 import sys
 
-from training.datasets import FlickrDataset, get_vocab_size
+from training.datasets import FlickrDataset, PascalSentencesDataset, get_vocab_size
 from training.models import Text2ImageMatchingModel
 from training.loaders import TrainValLoader
 from training.evaluators import Evaluator
@@ -134,7 +134,8 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         epochs: int,
         recall_at: int,
     ):
-        """
+        """Creates a finder that will find the best hyperparameters for the Flickr
+        datasets.
 
         Args:
             images_path: The path to all Flickr8k images.
@@ -211,7 +212,146 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             layers,
             attn_size,
             attn_hops,
-            frob_norm_pen,
+            opt,
+            learning_rate,
+            gradient_clip_val,
+        )
+
+        with tf.Session() as sess:
+            # Initialize model
+            model.init(sess, self.imagenet_checkpoint_path, imagenet_checkpoint=True)
+            for e in range(self.epochs):
+                # Reset the evaluator
+                evaluator_val.reset_all_vars()
+
+                # Initialize iterator with training data
+                sess.run(loader.train_init)
+                try:
+                    while True:
+                        _, loss = sess.run(
+                            [model.optimize, model.loss],
+                            feed_dict={
+                                model.keep_prob: keep_prob,
+                                model.weight_decay: weight_decay,
+                                model.frob_norm_pen: frob_norm_pen,
+                            },
+                        )
+                except tf.errors.OutOfRangeError:
+                    pass
+
+                # Initialize iterator with validation data
+                sess.run(loader.val_init)
+                try:
+                    while True:
+                        loss, embedded_images, embedded_captions = sess.run(
+                            [model.loss, model.attended_images, model.attended_captions]
+                        )
+                        evaluator_val.update_metrics(loss)
+                        evaluator_val.update_embeddings(
+                            embedded_images, embedded_captions
+                        )
+                except tf.errors.OutOfRangeError:
+                    pass
+
+                if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
+                    evaluator_val.update_best_image2text_recall_at_k()
+
+        logger.info(
+            f"Current best image to text recall at K is: {-evaluator_val.best_image2text_recall_at_k}"
+        )
+
+        return -evaluator_val.best_image2text_recall_at_k
+
+
+class PascalHparamsFinder(BaseHparamsFinder):
+    def __init__(
+        self,
+        images_path: str,
+        texts_path: str,
+        val_size: float,
+        batch_size: int,
+        prefetch_size: int,
+        imagenet_checkpoint_path: str,
+        epochs: int,
+        recall_at: int,
+    ):
+        """Creates a finder that will find the best hyperparameters for the Pascal
+        sentences datasets.
+
+        Args:
+            images_path: The path to all Pascal sentences images.
+            texts_path: The path to the captions.
+            val_size: The size of the validation set.
+            batch_size: The batch size that will be used to conduct the experiments.
+            prefetch_size: The prefetching size when running on GPU.
+            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
+            epochs: The number of epochs per experiment.
+            recall_at: Recall at K (this is K) evaluation metric.
+        """
+
+        super().__init__(
+            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
+        )
+        self.images_path = images_path
+        self.texts_path = texts_path
+        self.val_size = val_size
+
+    def objective(self, args: Dict[str, Any]):
+        logger.info(f"Trying out hyperparameters: {args}")
+
+        min_unk_sub = args["min_unk_sub"]
+        rnn_hidden_size = args["rnn_hidden_size"]
+        margin = args["margin"]
+        embed_size = args["embed_size"]
+        cell = args["cell"]
+        layers = args["layers"]
+        attn_size = args["attn_size"]
+        attn_hops = args["attn_hops"]
+        frob_norm_pen = args["frob_norm_pen"]
+        opt = args["opt"]
+        learning_rate = args["learning_rate"]
+        gradient_clip_val = args["gradient_clip_val"]
+        keep_prob = args["keep_prob"]
+        weight_decay = args["weight_decay"]
+
+        dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
+        train_image_paths, train_captions, train_captions_lengths = dataset.get_train_data(
+            self.val_size
+        )
+        # Getting the vocabulary size of the train dataset
+        val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data(
+            self.val_size
+        )
+        # The number of features at the output will be: rnn_hidden_size * 2 * attn_hops
+        evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * 2 * attn_hops)
+
+        # Resetting the default graph and setting the random seed
+        tf.reset_default_graph()
+        tf.set_random_seed(self.seed)
+
+        loader = TrainValLoader(
+            train_image_paths,
+            train_captions,
+            train_captions_lengths,
+            val_image_paths,
+            val_captions,
+            val_captions_lengths,
+            self.batch_size,
+            self.prefetch_size,
+        )
+        images, captions, captions_lengths = loader.get_next()
+        model = Text2ImageMatchingModel(
+            images,
+            captions,
+            captions_lengths,
+            margin,
+            rnn_hidden_size,
+            get_vocab_size(PascalSentencesDataset),
+            embed_size,
+            cell,
+            layers,
+            attn_size,
+            attn_hops,
             opt,
             learning_rate,
             gradient_clip_val,

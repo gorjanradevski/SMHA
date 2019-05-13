@@ -410,13 +410,21 @@ class PascalSentencesDataset:
     def parse_captions_filenames(
         texts_path: str, images_path: str
     ) -> Dict[str, Dict[str, List[List[str]]]]:
-        """
+        """Creates a dictionary of dictionaries where:
+
+        1. The keys of the first dict are the different categories of data.
+        2. The keys of the second dict are the image paths for the corresponding
+        category.
+        3. The values of the of second dict are a list of list where each list holds the
+        5 different captions for the image path, and each sublist holds the indexed
+        words of the caption.
 
         Args:
-            texts_path:
-            images_path:
+            texts_path: Path where the image captions are.
+            images_path: Path where the images are.
 
         Returns:
+            A dictionary as explained above.
 
         """
         category_image_path_captions: Dict[str, Dict[str, List[List[str]]]] = dict(
@@ -444,7 +452,28 @@ class PascalSentencesDataset:
         return category_image_path_captions
 
     @classmethod
-    def set_up_class_vars(cls, category_image_path_captions, min_unk_sub: int):
+    def set_up_class_vars(
+        cls,
+        category_image_path_captions: Dict[str, Dict[str, List[List[str]]]],
+        min_unk_sub: int,
+    ) -> None:
+        """Sets up the class variables word_freq, word2index and index2word.
+
+        1. Computes the word frequencies and sets the class variable with the values.
+        The class variable is a dictionary where the key is the word and the value is
+        how many times that word occurs in the dataset.
+        2. Creates a dict where each word is mapped to an index.
+        3. Creates a dict where each index is mapped to a word.
+
+        Args:
+            category_image_path_captions: A really really complex dictionary :(
+            min_unk_sub: The minimum frequency a word has to have in order to be left
+            in the vocabulary.
+
+        Returns:
+            None
+
+        """
         for category in category_image_path_captions.keys():
             for file in category_image_path_captions[category].keys():
                 for caption in category_image_path_captions[category][file]:
@@ -473,14 +502,24 @@ class PascalSentencesDataset:
         )
 
     @staticmethod
-    def get_data_wrapper(category_image_path_captions, val_size: int):
-        train_image_paths = []
-        train_captions = []
-        train_lengths = []
-        val_image_paths = []
-        val_captions = []
-        val_lengths = []
+    def get_data_wrapper(
+        category_image_path_captions, data_size: float, data_type: str
+    ):
+        """Returns the image paths, the captions and the captions lengths.
 
+        Args:
+            category_image_path_captions: A really compex dict :(
+            data_size: The size of the data part.
+            data_type: The type of the data that is returned (Train, val or test).
+
+        Returns:
+            The image paths, the captions and the captions lengths.
+
+        """
+        image_paths = []
+        captions = []
+        lengths = []
+        data_size = data_size * 50
         for category in category_image_path_captions.keys():
             for v, image_path in enumerate(
                 category_image_path_captions[category].keys()
@@ -492,27 +531,29 @@ class PascalSentencesDataset:
                         else 1
                         for word in caption
                     ]
-                    if v >= val_size:
-                        train_image_paths.append(image_path)
-                        train_captions.append(indexed_caption)
-                        train_lengths.append([len(caption)])
-                    else:
-                        val_image_paths.append(image_path)
-                        val_captions.append(indexed_caption)
-                        val_lengths.append([len(caption)])
+                    if data_type == "train":
+                        if v < data_size:
+                            image_paths.append(image_path)
+                            captions.append(indexed_caption)
+                            lengths.append([len(caption)])
+                    elif data_type == "val":
+                        if v >= data_size:
+                            image_paths.append(image_path)
+                            captions.append(indexed_caption)
+                            lengths.append([len(caption)])
 
-        return (
-            train_image_paths,
-            train_captions,
-            train_lengths,
-            val_image_paths,
-            val_captions,
-            val_lengths,
+        return image_paths, captions, lengths
+
+    def get_train_data(self, size):
+        img_paths, cap, lengths = self.get_data_wrapper(
+            self.category_image_path_captions, size, "train"
         )
 
-    def get_data(self, val_size):
-        t_img_paths, t_cap, t_lens, v_img_paths, v_cap, v_lens = self.get_data_wrapper(
-            self.category_image_path_captions, val_size
+        return img_paths, cap, lengths
+
+    def get_val_data(self, size):
+        img_paths, cap, lengths = self.get_data_wrapper(
+            self.category_image_path_captions, size, "val"
         )
 
-        return t_img_paths, t_cap, t_lens, v_img_paths, v_cap, v_lens
+        return img_paths, cap, lengths

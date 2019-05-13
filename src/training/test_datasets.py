@@ -5,6 +5,7 @@ from training.datasets import (
     TrainCocoDataset,
     preprocess_caption,
     FlickrDataset,
+    PascalSentencesDataset,
 )
 
 
@@ -112,6 +113,16 @@ def flickr_val_path():
     return "data/testing_assets/flickr_val.txt"
 
 
+@pytest.fixture
+def pascal_images_path():
+    return "data/testing_assets/pascal_images_texts/images"
+
+
+@pytest.fixture
+def pascal_texts_path():
+    return "data/testing_assets/pascal_images_texts/texts"
+
+
 def test_coco_read_json(coco_json_path):
     json_file = BaseCocoDataset.read_json(coco_json_path)
     assert "images" in json_file
@@ -209,3 +220,22 @@ def test_flickr_get_data(
     for caption, length, true_len in zip(val_captions, val_lengths, true_val_lengths):
         assert len(caption) == np.squeeze(length)
         assert np.squeeze(length) == true_len
+
+
+def test_pascal_parse_captions_filenames(pascal_images_path, pascal_texts_path):
+    category_image_path_captions = PascalSentencesDataset.parse_captions_filenames(
+        pascal_texts_path, pascal_images_path
+    )
+    count_cat = 0
+    count_files = 0
+    count_sentences = 0
+    for category in category_image_path_captions:
+        count_cat += 1
+        for file in category_image_path_captions[category]:
+            count_files += 1
+            for sentence in category_image_path_captions[category][file]:
+                count_sentences += 1
+
+    assert count_cat == 3
+    assert count_files == 9
+    assert count_sentences == 45
