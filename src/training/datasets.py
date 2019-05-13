@@ -10,8 +10,6 @@ from utils.constants import PAD_ID, UNK_ID
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# TODO: Flickr30k dataset
-
 
 def preprocess_caption(caption: str) -> List[str]:
     """Basic method used around all classes
@@ -393,3 +391,128 @@ class FlickrDataset:
         )
 
         return image_paths, captions, lengths
+
+
+class PascalSentencesDataset:
+
+    # Adapted for working with the Pascal sentences dataset.
+    word_freq: Dict[str, int] = {}
+    word2index: Dict[str, int] = {}
+    index2word: Dict[int, str] = {}
+
+    def __init__(self, images_path, texts_path, min_unk_sub):
+        self.category_image_path_captions = self.parse_captions_filenames(
+            texts_path, images_path
+        )
+        self.set_up_class_vars(self.category_image_path_captions, min_unk_sub)
+
+    @staticmethod
+    def parse_captions_filenames(
+        texts_path: str, images_path: str
+    ) -> Dict[str, Dict[str, List[List[str]]]]:
+        """
+
+        Args:
+            texts_path:
+            images_path:
+
+        Returns:
+
+        """
+        category_image_path_captions: Dict[str, Dict[str, List[List[str]]]] = dict(
+            dict()
+        )
+        for category in os.listdir(texts_path):
+            file_path = os.path.join(texts_path, category)
+            if os.path.isdir(file_path):
+                if category not in category_image_path_captions:
+                    category_image_path_captions[category] = {}
+                for txt_file in os.listdir(file_path):
+                    if txt_file.endswith(".txt"):
+                        image_path = os.path.join(
+                            images_path, category, txt_file[:-3] + "jpg"
+                        )
+                        if image_path not in category_image_path_captions[category]:
+                            category_image_path_captions[category][image_path] = []
+                        txt_file_path = os.path.join(file_path, txt_file)
+                        with open(txt_file_path, "r") as f:
+                            for caption in f:
+                                category_image_path_captions[category][
+                                    image_path
+                                ].append(preprocess_caption(caption))
+
+        return category_image_path_captions
+
+    @classmethod
+    def set_up_class_vars(cls, category_image_path_captions, min_unk_sub: int):
+        for category in category_image_path_captions.keys():
+            for file in category_image_path_captions[category].keys():
+                for caption in category_image_path_captions[category][file]:
+                    for word in caption:
+                        if word not in PascalSentencesDataset.word_freq.keys():
+                            PascalSentencesDataset.word_freq[word] = 0
+                        PascalSentencesDataset.word_freq[word] += 1
+        index = 2
+        PascalSentencesDataset.word2index = {"<pad>": PAD_ID, "<unk>": UNK_ID}
+        for category in category_image_path_captions.keys():
+            for file in category_image_path_captions[category].keys():
+                for caption in category_image_path_captions[category][file]:
+                    for word in caption:
+                        if (
+                            word not in PascalSentencesDataset.word2index.keys()
+                            and PascalSentencesDataset.word_freq[word] >= min_unk_sub
+                        ):
+                            PascalSentencesDataset.word2index[word] = index
+                            index += 1
+
+        PascalSentencesDataset.index2word = dict(
+            zip(
+                PascalSentencesDataset.word2index.values(),
+                PascalSentencesDataset.word2index.keys(),
+            )
+        )
+
+    @staticmethod
+    def get_data_wrapper(category_image_path_captions, val_size: int):
+        train_image_paths = []
+        train_captions = []
+        train_lengths = []
+        val_image_paths = []
+        val_captions = []
+        val_lengths = []
+
+        for category in category_image_path_captions.keys():
+            for v, image_path in enumerate(
+                category_image_path_captions[category].keys()
+            ):
+                for caption in category_image_path_captions[category][image_path]:
+                    indexed_caption = [
+                        PascalSentencesDataset.word2index[word]
+                        if word in PascalSentencesDataset.word2index.keys()
+                        else 1
+                        for word in caption
+                    ]
+                    if v >= val_size:
+                        train_image_paths.append(image_path)
+                        train_captions.append(indexed_caption)
+                        train_lengths.append([len(caption)])
+                    else:
+                        val_image_paths.append(image_path)
+                        val_captions.append(indexed_caption)
+                        val_lengths.append([len(caption)])
+
+        return (
+            train_image_paths,
+            train_captions,
+            train_lengths,
+            val_image_paths,
+            val_captions,
+            val_lengths,
+        )
+
+    def get_data(self, val_size):
+        t_img_paths, t_cap, t_lens, v_img_paths, v_cap, v_lens = self.get_data_wrapper(
+            self.category_image_path_captions, val_size
+        )
+
+        return t_img_paths, t_cap, t_lens, v_img_paths, v_cap, v_lens

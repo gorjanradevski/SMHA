@@ -4,7 +4,7 @@ import logging
 from tqdm import tqdm
 import os
 
-from training.datasets import FlickrDataset, get_vocab_size
+from training.datasets import PascalSentencesDataset, get_vocab_size
 from training.hyperparameters import YParams
 from training.loaders import TrainValLoader
 from training.models import Text2ImageMatchingModel
@@ -20,8 +20,7 @@ def train(
     hparams_path: str,
     images_path: str,
     texts_path: str,
-    train_imgs_file_path: str,
-    val_imgs_file_path: str,
+    val_size: int,
     epochs: int,
     batch_size: int,
     prefetch_size: int,
@@ -53,12 +52,9 @@ def train(
 
     """
     hparams = YParams(hparams_path)
-    dataset = FlickrDataset(images_path, texts_path, hparams.min_unk_sub)
-    train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
-        train_imgs_file_path
-    )
-    val_image_paths, val_captions, val_captions_lengths = dataset.get_data(
-        val_imgs_file_path
+    dataset = PascalSentencesDataset(images_path, texts_path, hparams.min_unk_sub)
+    train_image_paths, train_captions, train_captions_lengths, val_image_paths, val_captions, val_captions_lengths = dataset.get_data(
+        val_size
     )
     logger.info("Train dataset created...")
     logger.info("Validation dataset created...")
@@ -94,7 +90,7 @@ def train(
         captions_lengths,
         hparams.margin,
         hparams.rnn_hidden_size,
-        get_vocab_size(FlickrDataset),
+        get_vocab_size(PascalSentencesDataset),
         hparams.embed_size,
         hparams.cell,
         hparams.layers,
@@ -197,8 +193,7 @@ def main():
         args.hparams_path,
         args.images_path,
         args.texts_path,
-        args.train_imgs_file_path,
-        args.val_imgs_file_path,
+        args.val_size,
         args.epochs,
         args.batch_size,
         args.prefetch_size,
@@ -218,8 +213,7 @@ def parse_args():
 
     """
     parser = argparse.ArgumentParser(
-        description="Performs training on the Flickr8k and Flicrk30k dataset."
-        "Defaults to the Flickr8k dataset."
+        description="Performs training on the Pascal sentences dataset."
     )
     parser.add_argument(
         "--hparams_path",
@@ -230,26 +224,20 @@ def parse_args():
     parser.add_argument(
         "--images_path",
         type=str,
-        default="data/Flickr8k_dataset/Flickr8k_Dataset",
+        default="data/Pascal_sentences_dataset/dataset",
         help="Path where all images are.",
     )
     parser.add_argument(
         "--texts_path",
         type=str,
-        default="data/Flickr8k_dataset/Flickr8k_text/Flickr8k.token.txt",
+        default="data/Pascal_sentences_dataset/sentence",
         help="Path to the file where the image to caption mappings are.",
     )
     parser.add_argument(
-        "--train_imgs_file_path",
-        type=str,
-        default="data/Flickr8k_dataset/Flickr8k_text/Flickr_8k.trainImages.txt",
-        help="Path to the file where the train images names are included.",
-    )
-    parser.add_argument(
-        "--val_imgs_file_path",
-        type=str,
-        default="data/Flickr8k_dataset/Flickr8k_text/Flickr_8k.devImages.txt",
-        help="Path to the file where the validation images names are included.",
+        "--val_size",
+        type=int,
+        default=5,
+        help="The number of images per category to include in the validation set.",
     )
     parser.add_argument(
         "--checkpoint_path",

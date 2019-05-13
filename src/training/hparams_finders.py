@@ -70,9 +70,7 @@ class BaseHparamsFinder(ABC):
             "margin": hp.uniform("margin", 0.01, 5),
             "attn_size": hp.choice("attn_size", range(20, 50)),
             "attn_hops": hp.choice("attn_hops", range(1, 50)),
-            "frob_norm_pen": hp.loguniform(
-                "frob_norm_pen", np.log(0.0001), np.log(3.0)
-            ),
+            "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
             "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
         }
 
