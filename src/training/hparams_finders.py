@@ -178,7 +178,6 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
             self.train_imgs_file_path
         )
-        # Getting the vocabulary size of the train dataset
         val_image_paths, val_captions, val_captions_lengths = dataset.get_data(
             self.val_imgs_file_path
         )
@@ -268,7 +267,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
         self,
         images_path: str,
         texts_path: str,
-        val_size: float,
         batch_size: int,
         prefetch_size: int,
         imagenet_checkpoint_path: str,
@@ -281,7 +279,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
         Args:
             images_path: The path to all Pascal sentences images.
             texts_path: The path to the captions.
-            val_size: The size of the validation set.
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
             imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
@@ -294,7 +291,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
         )
         self.images_path = images_path
         self.texts_path = texts_path
-        self.val_size = val_size
 
     def objective(self, args: Dict[str, Any]):
         logger.info(f"Trying out hyperparameters: {args}")
@@ -315,13 +311,11 @@ class PascalHparamsFinder(BaseHparamsFinder):
         weight_decay = args["weight_decay"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
-        train_image_paths, train_captions, train_captions_lengths = dataset.get_train_data(
-            1 - self.val_size
+        train_image_paths, train_captions, train_captions_lengths = (
+            dataset.get_train_data()
         )
         # Getting the vocabulary size of the train dataset
-        val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data(
-            self.val_size
-        )
+        val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data()
         # The number of features at the output will be: rnn_hidden_size * 2 * attn_hops
         evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * 2 * attn_hops)
 

@@ -5,7 +5,7 @@ import logging
 from abc import ABC
 from typing import Dict, Any, List, Tuple, ValuesView
 
-from utils.constants import PAD_ID, UNK_ID
+from utils.constants import PAD_ID, UNK_ID, pascal_train_size, pascal_val_size
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -502,14 +502,11 @@ class PascalSentencesDataset:
         )
 
     @staticmethod
-    def get_data_wrapper(
-        category_image_path_captions, data_size: float, data_type: str
-    ):
+    def get_data_wrapper(category_image_path_captions, data_type: str):
         """Returns the image paths, the captions and the captions lengths.
 
         Args:
             category_image_path_captions: A really compex dict :(
-            data_size: The size of the data part.
             data_type: The type of the data that is returned (Train, val or test).
 
         Returns:
@@ -519,7 +516,8 @@ class PascalSentencesDataset:
         image_paths = []
         captions = []
         lengths = []
-        data_size = data_size * 50
+        train_size = pascal_train_size * 50
+        val_size = pascal_val_size * 50
         for category in category_image_path_captions.keys():
             for v, image_path in enumerate(
                 category_image_path_captions[category].keys()
@@ -532,28 +530,42 @@ class PascalSentencesDataset:
                         for word in caption
                     ]
                     if data_type == "train":
-                        if v >= data_size:
+                        if v < train_size:
                             image_paths.append(image_path)
                             captions.append(indexed_caption)
                             lengths.append([len(caption)])
                     elif data_type == "val":
-                        if v < data_size:
+                        if train_size + val_size > v >= train_size:
                             image_paths.append(image_path)
                             captions.append(indexed_caption)
                             lengths.append([len(caption)])
+                    elif data_type == "test":
+                        if v >= train_size + val_size:
+                            image_paths.append(image_path)
+                            captions.append(indexed_caption)
+                            lengths.append([len(caption)])
+                    else:
+                        raise ValueError("Wrong data type!")
 
         return image_paths, captions, lengths
 
-    def get_train_data(self, size):
+    def get_train_data(self):
         img_paths, cap, lengths = self.get_data_wrapper(
-            self.category_image_path_captions, 1 - size, "train"
+            self.category_image_path_captions, "train"
         )
 
         return img_paths, cap, lengths
 
-    def get_val_data(self, size):
+    def get_val_data(self):
         img_paths, cap, lengths = self.get_data_wrapper(
-            self.category_image_path_captions, size, "val"
+            self.category_image_path_captions, "val"
+        )
+
+        return img_paths, cap, lengths
+
+    def get_test_data(self):
+        img_paths, cap, lengths = self.get_data_wrapper(
+            self.category_image_path_captions, "test"
         )
 
         return img_paths, cap, lengths

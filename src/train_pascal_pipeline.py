@@ -20,7 +20,6 @@ def train(
     hparams_path: str,
     images_path: str,
     texts_path: str,
-    val_size: int,
     epochs: int,
     batch_size: int,
     prefetch_size: int,
@@ -36,7 +35,6 @@ def train(
         hparams_path: The path to the hyperparameters yaml file.
         images_path: A path where all the images are located.
         texts_path: Path where the text doc with the descriptions is.
-        val_size: Size of the validation set.
         epochs: The number of epochs to train the model.
         batch_size: The batch size to be used.
         prefetch_size: How many batches to keep on GPU ready for processing.
@@ -52,10 +50,8 @@ def train(
     """
     hparams = YParams(hparams_path)
     dataset = PascalSentencesDataset(images_path, texts_path, hparams.min_unk_sub)
-    train_image_paths, train_captions, train_captions_lengths = dataset.get_train_data(
-        1 - val_size
-    )
-    val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data(val_size)
+    train_image_paths, train_captions, train_captions_lengths = dataset.get_train_data()
+    val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data()
     logger.info("Train dataset created...")
     logger.info("Validation dataset created...")
 
@@ -193,7 +189,6 @@ def main():
         args.hparams_path,
         args.images_path,
         args.texts_path,
-        args.val_size,
         args.epochs,
         args.batch_size,
         args.prefetch_size,
@@ -232,12 +227,6 @@ def parse_args():
         type=str,
         default="data/Pascal_sentences_dataset/sentence",
         help="Path to the file where the image to caption mappings are.",
-    )
-    parser.add_argument(
-        "--val_size",
-        type=float,
-        default=0.2,
-        help="The percentage of images per category to include in the validation set.",
     )
     parser.add_argument(
         "--checkpoint_path",

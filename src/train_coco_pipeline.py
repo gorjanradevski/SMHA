@@ -57,7 +57,6 @@ def train(
         train_images_path, train_json_path, hparams.min_unk_sub
     )
     train_image_paths, train_captions, train_captions_lengths = train_dataset.get_data()
-    # Getting the vocabulary size of the train dataset
     logger.info("Train dataset created...")
     val_dataset = ValCocoDataset(val_images_path, val_json_path)
     val_image_paths, val_captions, val_captions_lengths = val_dataset.get_data()

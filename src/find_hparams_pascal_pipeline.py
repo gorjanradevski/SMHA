@@ -10,7 +10,6 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 def optimize(
     images_path: str,
     texts_path: str,
-    val_size: float,
     batch_size: int,
     prefetch_size: int,
     imagenet_checkpoint_path: str,
@@ -26,7 +25,6 @@ def optimize(
     Args:
         images_path: The path to the images.
         texts_path: The path to the captions.
-        val_size: The size of the validation set.
         batch_size: The batch size that will be used to conduct the experiments.
         prefetch_size: The prefetching size when running on GPU.
         imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
@@ -43,7 +41,6 @@ def optimize(
     hparams_finder = PascalHparamsFinder(
         images_path,
         texts_path,
-        val_size,
         batch_size,
         prefetch_size,
         imagenet_checkpoint_path,
@@ -60,7 +57,6 @@ def main():
     optimize(
         args.images_path,
         args.texts_path,
-        args.val_size,
         args.batch_size,
         args.prefetch_size,
         args.checkpoint_path,
@@ -95,9 +91,6 @@ def parse_args():
         type=str,
         default="data/Pascal_sentences_dataset/sentence",
         help="Path to the file where the image to caption mappings are.",
-    )
-    parser.add_argument(
-        "--val_size", type=float, default=0.2, help="Size of the validation set."
     )
     parser.add_argument(
         "--checkpoint_path",

@@ -4,7 +4,7 @@ import logging
 from tqdm import tqdm
 import os
 
-from training.datasets import FlickrDataset, get_vocab_size
+from training.datasets import PascalSentencesDataset, get_vocab_size
 from training.hyperparameters import YParams
 from training.loaders import TestLoader
 from training.models import Text2ImageMatchingModel
@@ -21,18 +21,16 @@ def inference(
     hparams_path: str,
     images_path: str,
     texts_path: str,
-    test_imgs_file_path,
     batch_size: int,
     prefetch_size: int,
     checkpoint_path: str,
 ) -> None:
-    """Performs inference on the Flickr8k test set.
+    """Performs inference on the Pascal sentences dataset.
 
     Args:
         hparams_path: The path to the hyperparameters yaml file.
         images_path: A path where all the images are located.
         texts_path: Path where the text doc with the descriptions is.
-        test_imgs_file_path: Path to a file with the test image names.
         batch_size: The batch size to be used.
         prefetch_size: How many batches to prefetch.
         checkpoint_path: Path to a valid model checkpoint.
@@ -42,11 +40,9 @@ def inference(
 
     """
     hparams = YParams(hparams_path)
-    dataset = FlickrDataset(images_path, texts_path, hparams.min_unk_sub)
+    dataset = PascalSentencesDataset(images_path, texts_path, hparams.min_unk_sub)
     # Getting the vocabulary size of the train dataset
-    test_image_paths, test_captions, test_captions_lengths = dataset.get_data(
-        test_imgs_file_path
-    )
+    test_image_paths, test_captions, test_captions_lengths = dataset.get_test_data()
     logger.info("Test dataset created...")
     # The number of features at the output will be: rnn_hidden_size * 2
     evaluator_test = Evaluator(len(test_image_paths), hparams.rnn_hidden_size * 2)
@@ -73,7 +69,7 @@ def inference(
         captions_lengths,
         hparams.margin,
         hparams.rnn_hidden_size,
-        get_vocab_size(FlickrDataset),
+        get_vocab_size(PascalSentencesDataset),
         hparams.embed_size,
         hparams.cell,
         hparams.layers,
@@ -122,7 +118,6 @@ def main():
         args.hparams_path,
         args.images_path,
         args.texts_path,
-        args.test_imgs_file_path,
         args.batch_size,
         args.prefetch_size,
         args.checkpoint_path,
@@ -137,8 +132,7 @@ def parse_args():
 
     """
     parser = argparse.ArgumentParser(
-        "Performs inference on the Flickr8k and Flickr30k datasets."
-        "Defaults to the Flickr8k dataset."
+        "Performs inference on the Pascal sentences dataset."
     )
     parser.add_argument(
         "--hparams_path",
@@ -149,20 +143,14 @@ def parse_args():
     parser.add_argument(
         "--images_path",
         type=str,
-        default="data/Flickr8k_dataset/Flickr8k_Dataset",
+        default="data/Pascal_sentences_dataset/dataset",
         help="Path where all images are.",
     )
     parser.add_argument(
         "--texts_path",
         type=str,
-        default="data/Flickr8k_dataset/Flickr8k_text/Flickr8k.token.txt",
-        help="Path to the file where the image to caption mappings are.",
-    )
-    parser.add_argument(
-        "--test_imgs_file_path",
-        type=str,
-        default="data/Flickr8k_dataset/Flickr8k_text/Flickr_8k.devImages.txt",
-        help="Path to the file where the test images names are included.",
+        default="data/Pascal_sentences_dataset/sentences",
+        help="Path where the captions are.",
     )
     parser.add_argument(
         "--checkpoint_path",
