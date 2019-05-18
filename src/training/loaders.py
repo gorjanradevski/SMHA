@@ -25,16 +25,16 @@ class BaseLoader(ABC):
         image = tf.cast(image, tf.float32)
         smallest_side = 256.0  # Max for VGG16
         height, width = tf.shape(image)[0], tf.shape(image)[1]
-        height = tf.to_float(height)
-        width = tf.to_float(width)
+        height = tf.cast(height, tf.float32)
+        width = tf.cast(width, tf.float32)
 
         scale = tf.cond(
             tf.greater(height, width),
             lambda: smallest_side / width,
             lambda: smallest_side / height,
         )
-        new_height = tf.to_int32(height * scale)
-        new_width = tf.to_int32(width * scale)
+        new_height = tf.cast(height * scale, tf.float32)
+        new_width = tf.cast(width * scale, tf.float32)
         image = tf.image.resize_images(image, [new_height, new_width])
 
         return image, caption, caption_len

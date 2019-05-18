@@ -1,4 +1,4 @@
-attn_hops: 16
+attn_heads: 16
 attn_size: 40
 cell: lstm
 embed_size: 267

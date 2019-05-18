@@ -28,7 +28,7 @@ class Text2ImageMatchingModel:
         cell_type: str,
         num_layers: int,
         attn_size: int,
-        attn_hops: int,
+        attn_heads: int,
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
@@ -73,14 +73,14 @@ class Text2ImageMatchingModel:
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.join_attention_graph(
-            attn_size, attn_hops, self.image_encoded
+            attn_size, attn_heads, self.image_encoded
         )
         # Reusing the same variables that were used for the images
         self.attended_captions, self.text_alphas = self.join_attention_graph(
-            attn_size, attn_hops, self.text_encoded
+            attn_size, attn_heads, self.text_encoded
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_hops)
+        self.loss = self.compute_loss(margin, attn_heads)
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
@@ -186,7 +186,7 @@ class Text2ImageMatchingModel:
             return tf.concat([output_fw, output_bw], axis=2)
 
     @staticmethod
-    def join_attention_graph(attn_size: int, attn_hops: int, encoded_input: tf.Tensor):
+    def join_attention_graph(attn_size: int, attn_heads: int, encoded_input: tf.Tensor):
         """Applies the same attention on the encoded image and the encoded text.
 
         As per: https://arxiv.org/pdf/1703.03130.pdf
@@ -196,7 +196,7 @@ class Text2ImageMatchingModel:
 
         Args:
             attn_size: The size of the attention.
-            attn_hops: How many hops of attention to apply.
+            attn_heads: How many hops of attention to apply.
             encoded_input: The encoded input, can be both the image and the text.
 
         Returns:
@@ -222,7 +222,7 @@ class Text2ImageMatchingModel:
             u_omega = tf.get_variable(
                 name="u_omega",
                 initializer=tf.random_normal(
-                    [attn_size, attn_hops], stddev=0.1, dtype=tf.float32
+                    [attn_size, attn_heads], stddev=0.1, dtype=tf.float32
                 ),
             )
 
@@ -234,7 +234,7 @@ class Text2ImageMatchingModel:
             # [B * T, A_hops]
             vu = tf.matmul(v, u_omega)
             # [B, T, A_hops]
-            vu = tf.reshape(vu, [-1, time_steps, attn_hops])
+            vu = tf.reshape(vu, [-1, time_steps, attn_heads])
             # [B, A_hops, T]
             vu_transposed = tf.transpose(vu, [0, 2, 1])
             # [B, A_hops, T]
@@ -247,12 +247,12 @@ class Text2ImageMatchingModel:
             return output, alphas
 
     @staticmethod
-    def compute_frob_norm(attention_weights: tf.Tensor, attn_hops: int):
+    def compute_frob_norm(attention_weights: tf.Tensor, attn_heads: int):
         """Computes the Frobenius norm of the attention weights tensor.
 
         Args:
             attention_weights: The attention weights.
-            attn_hops: The number of attention hops
+            attn_heads: The number of attention hops
 
         Returns:
             The Frobenius norm of the attention weights tensor.
@@ -262,8 +262,8 @@ class Text2ImageMatchingModel:
             attention_weights, tf.transpose(attention_weights, [0, 2, 1])
         )
         identity_matrix = tf.reshape(
-            tf.tile(tf.eye(attn_hops), [tf.shape(attention_weights)[0], 1]),
-            [-1, attn_hops, attn_hops],
+            tf.tile(tf.eye(attn_heads), [tf.shape(attention_weights)[0], 1]),
+            [-1, attn_heads, attn_heads],
         )
         return tf.reduce_sum(
             tf.square(
@@ -271,7 +271,7 @@ class Text2ImageMatchingModel:
             )
         )
 
-    def compute_loss(self, margin: float, attn_hops: int) -> tf.Tensor:
+    def compute_loss(self, margin: float, attn_heads: int) -> tf.Tensor:
         """Computes the contrastive loss.
 
         1. Computes the contrastive loss between the image and text embeddings.
@@ -282,7 +282,7 @@ class Text2ImageMatchingModel:
 
         Args:
             margin: The contrastive margin.
-            attn_hops: The number of attention hops.
+            attn_heads: The number of attention hops.
 
         Returns:
             The contrastive loss using the batch-all strategy.
@@ -294,16 +294,21 @@ class Text2ImageMatchingModel:
             )
             diagonal = tf.diag_part(scores)
 
-            # compare every diagonal score to scores in its column
-            # (i.e, all contrastive images for each sentence)
+            # Compare every diagonal score to scores in its column
+            # All contrastive images for each sentence
             cost_s = tf.maximum(0.0, margin - diagonal + scores)
-            # compare every diagonal score to scores in its row
-            # (i.e, all contrastive sentences for each image)
+            # Compare every diagonal score to scores in its row
+            # All contrastive sentences for each image
             cost_im = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
 
-            # clear diagonals
+            # Clear diagonals
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
+
+            # For each positive pair (i,m) pick the hardest contrastive image
+            cost_s = tf.reduce_sum(cost_s, axis=1)
+            # For each positive pair (i,m) pick the hardest contrastive sentence
+            cost_im = tf.reduce_sum(cost_im, axis=0)
 
             loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
@@ -319,11 +324,12 @@ class Text2ImageMatchingModel:
             )
 
             pen_image_alphas = (
-                self.compute_frob_norm(self.image_alphas, attn_hops)
+                self.compute_frob_norm(self.image_alphas, attn_heads)
                 * self.frob_norm_pen
             )
             pen_text_alphas = (
-                self.compute_frob_norm(self.text_alphas, attn_hops) * self.frob_norm_pen
+                self.compute_frob_norm(self.text_alphas, attn_heads)
+                * self.frob_norm_pen
             )
 
             return loss + l2 + pen_image_alphas + pen_text_alphas

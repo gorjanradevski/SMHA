@@ -95,7 +95,7 @@ def clip_value():
 
 
 @pytest.fixture
-def attn_hops():
+def attn_heads():
     return 5
 
 
@@ -168,11 +168,11 @@ def test_text_encoder(
     assert outputs[2] == 2 * rnn_hidden_size
 
 
-def test_joint_attention(rnn_hidden_size, attn_size, attn_hops, encoded_input):
+def test_joint_attention(rnn_hidden_size, attn_size, attn_heads, encoded_input):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[5, 10, 100])
     attention = Text2ImageMatchingModel.join_attention_graph(
-        attn_size, attn_hops, input_layer
+        attn_size, attn_heads, input_layer
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -180,7 +180,7 @@ def test_joint_attention(rnn_hidden_size, attn_size, attn_hops, encoded_input):
             attention, feed_dict={input_layer: encoded_input}
         )
         assert attended_input.shape[0] == 5
-        assert attended_input.shape[1] == rnn_hidden_size * 2 * attn_hops
+        assert attended_input.shape[1] == rnn_hidden_size * 2 * attn_heads
 
 
 def test_attended_image_text_shape(
@@ -194,7 +194,7 @@ def test_attended_image_text_shape(
     cell_type,
     num_layers,
     attn_size,
-    attn_hops,
+    attn_heads,
     optimizer_type,
     learning_rate,
     clip_value,
@@ -211,7 +211,7 @@ def test_attended_image_text_shape(
         cell_type,
         num_layers,
         attn_size,
-        attn_hops,
+        attn_heads,
         optimizer_type,
         learning_rate,
         clip_value,

@@ -69,7 +69,7 @@ class BaseHparamsFinder(ABC):
             "opt": hp.choice("opt", ["adam", "sgd", "rmsprop"]),
             "margin": hp.uniform("margin", 0.01, 5),
             "attn_size": hp.choice("attn_size", range(20, 50)),
-            "attn_hops": hp.choice("attn_hops", range(1, 50)),
+            "attn_heads": hp.choice("attn_heads", range(1, 50)),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
             "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
         }
@@ -166,7 +166,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         cell = args["cell"]
         layers = args["layers"]
         attn_size = args["attn_size"]
-        attn_hops = args["attn_hops"]
+        attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
         opt = args["opt"]
         learning_rate = args["learning_rate"]
@@ -181,8 +181,10 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         val_image_paths, val_captions, val_captions_lengths = dataset.get_data(
             self.val_imgs_file_path
         )
-        # The number of features at the output will be: rnn_hidden_size * 2 * attn_hops
-        evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * 2 * attn_hops)
+        # The number of features at the output will be: rnn_hidden_size * 2 * attn_heads
+        evaluator_val = Evaluator(
+            len(val_image_paths), rnn_hidden_size * 2 * attn_heads
+        )
 
         # Resetting the default graph and setting the random seed
         tf.reset_default_graph()
@@ -210,7 +212,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             cell,
             layers,
             attn_size,
-            attn_hops,
+            attn_heads,
             opt,
             learning_rate,
             gradient_clip_val,
@@ -302,7 +304,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         cell = args["cell"]
         layers = args["layers"]
         attn_size = args["attn_size"]
-        attn_hops = args["attn_hops"]
+        attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
         opt = args["opt"]
         learning_rate = args["learning_rate"]
@@ -316,8 +318,10 @@ class PascalHparamsFinder(BaseHparamsFinder):
         )
         # Getting the vocabulary size of the train dataset
         val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data()
-        # The number of features at the output will be: rnn_hidden_size * 2 * attn_hops
-        evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * 2 * attn_hops)
+        # The number of features at the output will be: rnn_hidden_size * 2 * attn_heads
+        evaluator_val = Evaluator(
+            len(val_image_paths), rnn_hidden_size * 2 * attn_heads
+        )
 
         # Resetting the default graph and setting the random seed
         tf.reset_default_graph()
@@ -345,7 +349,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
             cell,
             layers,
             attn_size,
-            attn_hops,
+            attn_heads,
             opt,
             learning_rate,
             gradient_clip_val,
