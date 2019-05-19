@@ -75,7 +75,6 @@ def inference(
         hparams.layers,
         hparams.attn_size,
         hparams.attn_heads,
-        hparams.frob_norm_pen,
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,

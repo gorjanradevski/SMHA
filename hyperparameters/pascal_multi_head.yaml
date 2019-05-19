@@ -1,0 +1,16 @@
+attn_heads: 6
+attn_size: 42
+cell: lstm
+embed_size: 355
+frob_norm_pen: 3.431253422061712
+gradient_clip_val: 1
+keep_prob: 0.69147784824303
+layers: 2
+learning_rate: 0.006529440730948872
+margin: 3.8292131558069915
+min_unk_sub: 6
+opt: rmsprop
+rnn_hidden_size: 131
+weight_decay: 5.128505924987032e-06
+name: GYLRV
+seed: 127865
