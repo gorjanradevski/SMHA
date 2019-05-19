@@ -48,8 +48,10 @@ def inference(
         test_imgs_file_path
     )
     logger.info("Test dataset created...")
-    # The number of features at the output will be: rnn_hidden_size * 2
-    evaluator_test = Evaluator(len(test_image_paths), hparams.rnn_hidden_size * 2)
+    # The number of features at the output will be: rnn_hidden_size * 2 * attn_heads
+    evaluator_test = Evaluator(
+        len(test_image_paths), hparams.rnn_hidden_size * 2 * hparams.attn_heads
+    )
 
     logger.info("Test evaluator created...")
 
