@@ -109,15 +109,25 @@ class Text2ImageMatchingModel:
                 [slim.conv2d, slim.max_pool2d],
                 outputs_collections=end_points_collection,
             ):
-                net = slim.repeat(images, 2, slim.conv2d, 64, [3, 3], scope="conv1")
+                net = slim.repeat(
+                    images, 2, slim.conv2d, 64, [3, 3], scope="conv1", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool1")
-                net = slim.repeat(net, 2, slim.conv2d, 128, [3, 3], scope="conv2")
+                net = slim.repeat(
+                    net, 2, slim.conv2d, 128, [3, 3], scope="conv2", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool2")
-                net = slim.repeat(net, 4, slim.conv2d, 256, [3, 3], scope="conv3")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 256, [3, 3], scope="conv3", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool3")
-                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv4")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 512, [3, 3], scope="conv4", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool4")
-                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv5")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
+                )
 
         flatten = tf.reshape(net, (-1, net.shape[3]))
         project_layer = tf.layers.dense(flatten, 2 * rnn_hidden_size)
