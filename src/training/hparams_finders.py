@@ -284,8 +284,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
         self.texts_path = texts_path
 
     def objective(self, args: Dict[str, Any]):
-        logger.info(f"Trying out hyperparameters: {args}")
-
         min_unk_sub = args["min_unk_sub"]
         rnn_hidden_size = args["rnn_hidden_size"]
         margin = args["margin"]
