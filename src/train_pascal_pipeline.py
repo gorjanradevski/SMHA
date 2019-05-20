@@ -9,6 +9,7 @@ from training.hyperparameters import YParams
 from training.loaders import TrainValLoader
 from training.models import Text2ImageMatchingModel
 from training.evaluators import Evaluator
+from utils.constants import recall_at
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,7 +28,6 @@ def train(
     imagenet_checkpoint: bool,
     save_model_path: str,
     log_model_path: str,
-    recall_at: int,
 ) -> None:
     """Starts a training session with the Pascal1k sentences dataset.
 
@@ -42,7 +42,6 @@ def train(
         imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
-        recall_at: Validate with recall at (input).
 
     Returns:
         None
@@ -174,7 +173,10 @@ def train(
                 [model.val_loss_summary, model.val_recall_at_k_summary],
                 feed_dict={
                     model.val_loss_ph: evaluator_val.loss,
-                    model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k,
+                    # Log recall at 10
+                    model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k[
+                        2
+                    ],
                 },
             )
             model.add_summary(sess, val_loss_summary)
@@ -196,7 +198,6 @@ def main():
         args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
-        args.recall_at,
     )
 
 
@@ -231,7 +232,7 @@ def parse_args():
     parser.add_argument(
         "--checkpoint_path",
         type=str,
-        default="models/image_encoders/vgg_16.ckpt",
+        default="models/image_encoders/vgg_19.ckpt",
         help="Path to a model checkpoint.",
     )
     parser.add_argument(
@@ -262,9 +263,6 @@ def parse_args():
     )
     parser.add_argument(
         "--prefetch_size", type=int, default=5, help="The size of prefetch on gpu."
-    )
-    parser.add_argument(
-        "--recall_at", type=int, default=5, help="Validate with recall at K (input)."
     )
 
     return parser.parse_args()

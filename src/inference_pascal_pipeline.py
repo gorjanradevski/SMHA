@@ -9,7 +9,7 @@ from training.hyperparameters import YParams
 from training.loaders import TestLoader
 from training.models import Text2ImageMatchingModel
 from training.evaluators import Evaluator
-from utils.constants import inference_for_recall_at
+from utils.constants import recall_at
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -105,9 +105,9 @@ def inference(
         except tf.errors.OutOfRangeError:
             pass
 
-    for recall_at in inference_for_recall_at:
         logger.info(
-            f"The recall at {recall_at} is: {evaluator_test.image2text_recall_at_k(recall_at)}"
+            f"The recall at {recall_at} is: "
+            f"{evaluator_test.image2text_recall_at_k(recall_at)}"
         )
 
 
@@ -156,7 +156,7 @@ def parse_args():
     parser.add_argument(
         "--checkpoint_path",
         type=str,
-        default="models/image_encoders/vgg_16.ckpt",
+        default="models/image_encoders/vgg_19.ckpt",
         help="Path to a model checkpoint.",
     )
     parser.add_argument(

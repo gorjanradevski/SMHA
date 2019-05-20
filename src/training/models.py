@@ -2,17 +2,13 @@ import tensorflow as tf
 import logging
 from typing import Tuple
 
-from tensorflow.contrib import layers
-from tensorflow.contrib.framework.python.ops import arg_scope
-from tensorflow.contrib.layers.python.layers import layers as layers_lib
-from tensorflow.python.ops import variable_scope
-
 from training.cells import cell_factory
 from training.optimizers import optimizer_factory
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+slim = tf.contrib.slim
 
 
 class Text2ImageMatchingModel:
@@ -73,20 +69,20 @@ class Text2ImageMatchingModel:
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.join_attention_graph(
-            attn_size, attn_heads, self.image_encoded
+            attn_size, attn_heads, self.image_encoded, "siamese_attention"
         )
         # Reusing the same variables that were used for the images
         self.attended_captions, self.text_alphas = self.join_attention_graph(
-            attn_size, attn_heads, self.text_encoded
+            attn_size, attn_heads, self.text_encoded, "siamese_attention"
         )
         logger.info("Attention graph created...")
         self.loss = self.compute_loss(margin, attn_heads)
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
-        # Imagenet graph loader and graph saver/loader
+        # ImageNet graph loader and graph saver/loader
         self.image_encoder_loader = tf.train.Saver(
-            tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_16")
+            tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_19")
         )
         self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")
@@ -96,8 +92,7 @@ class Text2ImageMatchingModel:
         """Extract higher level features from the image using a conv net pretrained on
         Image net.
 
-        As per: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/
-        slim/python/slim/nets/vgg.py
+        https://github.com/tensorflow/models/blob/master/research/slim/nets/vgg.py
 
         Args:
             images: The input images.
@@ -107,31 +102,22 @@ class Text2ImageMatchingModel:
             The encoded image.
 
         """
-        with variable_scope.variable_scope("vgg_16", "vgg_16", [images]) as sc:
+        with tf.variable_scope("vgg_19", "vgg_19", [images]) as sc:
             end_points_collection = sc.original_name_scope + "_end_points"
-            with arg_scope(
-                [layers.conv2d, layers_lib.max_pool2d],
+            # Collect outputs for conv2d, fully_connected and max_pool2d.
+            with slim.arg_scope(
+                [slim.conv2d, slim.max_pool2d],
                 outputs_collections=end_points_collection,
             ):
-                net = layers_lib.repeat(
-                    images, 2, layers.conv2d, 64, [3, 3], scope="conv1", trainable=False
-                )
-                net = layers_lib.max_pool2d(net, [2, 2], scope="pool1")
-                net = layers_lib.repeat(
-                    net, 2, layers.conv2d, 128, [3, 3], scope="conv2", trainable=False
-                )
-                net = layers_lib.max_pool2d(net, [2, 2], scope="pool2")
-                net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 256, [3, 3], scope="conv3", trainable=False
-                )
-                net = layers_lib.max_pool2d(net, [2, 2], scope="pool3")
-                net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 512, [3, 3], scope="conv4", trainable=False
-                )
-                net = layers_lib.max_pool2d(net, [2, 2], scope="pool4")
-                net = layers_lib.repeat(
-                    net, 3, layers.conv2d, 512, [3, 3], scope="conv5", trainable=False
-                )
+                net = slim.repeat(images, 2, slim.conv2d, 64, [3, 3], scope="conv1")
+                net = slim.max_pool2d(net, [2, 2], scope="pool1")
+                net = slim.repeat(net, 2, slim.conv2d, 128, [3, 3], scope="conv2")
+                net = slim.max_pool2d(net, [2, 2], scope="pool2")
+                net = slim.repeat(net, 4, slim.conv2d, 256, [3, 3], scope="conv3")
+                net = slim.max_pool2d(net, [2, 2], scope="pool3")
+                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv4")
+                net = slim.max_pool2d(net, [2, 2], scope="pool4")
+                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv5")
 
         flatten = tf.reshape(net, (-1, net.shape[3]))
         project_layer = tf.layers.dense(flatten, 2 * rnn_hidden_size)
@@ -186,8 +172,10 @@ class Text2ImageMatchingModel:
             return tf.concat([output_fw, output_bw], axis=2)
 
     @staticmethod
-    def join_attention_graph(attn_size: int, attn_heads: int, encoded_input: tf.Tensor):
-        """Applies the same attention on the encoded image and the encoded text.
+    def join_attention_graph(
+        attn_size: int, attn_heads: int, encoded_input: tf.Tensor, scope: str
+    ):
+        """Applies attention on the encoded image and the encoded text.
 
         As per: https://arxiv.org/pdf/1703.03130.pdf
 
@@ -198,12 +186,13 @@ class Text2ImageMatchingModel:
             attn_size: The size of the attention.
             attn_heads: How many hops of attention to apply.
             encoded_input: The encoded input, can be both the image and the text.
+            scope: The scope of the graph block.
 
         Returns:
             Attended output.
 
         """
-        with tf.variable_scope(name_or_scope="joint_attention", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope(name_or_scope=scope, reuse=tf.AUTO_REUSE):
             # Shape parameters
             time_steps = tf.shape(encoded_input)[1]
             hidden_size = encoded_input.get_shape()[2].value
@@ -265,16 +254,16 @@ class Text2ImageMatchingModel:
             tf.tile(tf.eye(attn_heads), [tf.shape(attention_weights)[0], 1]),
             [-1, attn_heads, attn_heads],
         )
-        return tf.reduce_sum(
+        return tf.reduce_mean(
             tf.square(
                 tf.norm(attn_w_dot_product - identity_matrix, axis=[-2, -1], ord="fro")
             )
         )
 
     def compute_loss(self, margin: float, attn_heads: int) -> tf.Tensor:
-        """Computes the contrastive loss.
+        """Computes the triplet loss.
 
-        1. Computes the contrastive loss between the image and text embeddings.
+        1. Computes the triplet loss between the image and text embeddings.
         2. Computes the Frob norm of the of the AA^T - I (image embeddings).
         3. Computes the Frob norm of the of the AA^T - I (text embeddings).
         4. Computes the L2 norm of the trainable weight matrices.
@@ -285,7 +274,7 @@ class Text2ImageMatchingModel:
             attn_heads: The number of attention hops.
 
         Returns:
-            The contrastive loss using the batch-all strategy.
+            The triplet loss using the batch-hard strategy.
 
         """
         with tf.variable_scope(name_or_scope="loss"):
@@ -305,10 +294,10 @@ class Text2ImageMatchingModel:
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-            # For each positive pair (i,m) pick the hardest contrastive image
-            cost_s = tf.reduce_sum(cost_s, axis=1)
-            # For each positive pair (i,m) pick the hardest contrastive sentence
-            cost_im = tf.reduce_sum(cost_im, axis=0)
+            # For each positive pair (i,s) pick the hardest contrastive image
+            cost_s = tf.reduce_max(cost_s, axis=1)
+            # For each positive pair (i,s) pick the hardest contrastive sentence
+            cost_im = tf.reduce_max(cost_im, axis=0)
 
             loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
@@ -345,7 +334,7 @@ class Text2ImageMatchingModel:
 
         Args:
             loss: The computed loss.
-            optimizer_type: The type of the optmizer.
+            optimizer_type: The type of the optimizer.
             learning_rate: The optimizer learning rate.
             clip_value: The clipping value.
 

@@ -15,6 +15,7 @@ from training.datasets import FlickrDataset, PascalSentencesDataset, get_vocab_s
 from training.models import Text2ImageMatchingModel
 from training.loaders import TrainValLoader
 from training.evaluators import Evaluator
+from utils.constants import recall_at
 
 logging.getLogger("training.datasets").setLevel(logging.ERROR)
 logging.getLogger("training.models").setLevel(logging.ERROR)
@@ -34,7 +35,6 @@ class BaseHparamsFinder(ABC):
         prefetch_size: int,
         imagenet_checkpoint_path: str,
         epochs: int,
-        recall_at: int,
     ):
         """Defines the search space and the general attributes.
 
@@ -43,13 +43,11 @@ class BaseHparamsFinder(ABC):
             prefetch_size: The prefetching size when running on GPU.
             imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
-            recall_at: Recall at K (this is K) evaluation metric.
         """
         self.batch_size = batch_size
         self.prefetch_size = prefetch_size
         self.imagenet_checkpoint_path = imagenet_checkpoint_path
         self.epochs = epochs
-        self.recall_at = recall_at
         # Set seed value for all experiments in the current iteration
         self.seed = datetime.now().microsecond
         # Generate experiment name
@@ -132,7 +130,6 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         prefetch_size: int,
         imagenet_checkpoint_path: str,
         epochs: int,
-        recall_at: int,
     ):
         """Creates a finder that will find the best hyperparameters for the Flickr
         datasets.
@@ -146,19 +143,14 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             prefetch_size: The prefetching size when running on GPU.
             imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
-            recall_at: Recall at K (this is K) evaluation metric.
         """
-        super().__init__(
-            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
-        )
+        super().__init__(batch_size, prefetch_size, imagenet_checkpoint_path, epochs)
         self.images_path = images_path
         self.texts_path = texts_path
         self.train_imgs_file_path = train_imgs_file_path
         self.val_imgs_file_path = val_imgs_file_path
 
     def objective(self, args: Dict[str, Any]):
-        logger.info(f"Trying out hyperparameters: {args}")
-
         min_unk_sub = args["min_unk_sub"]
         rnn_hidden_size = args["rnn_hidden_size"]
         margin = args["margin"]
@@ -254,14 +246,15 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                 except tf.errors.OutOfRangeError:
                     pass
 
-                if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
+                if evaluator_val.is_best_image2text_recall_at_k(recall_at):
                     evaluator_val.update_best_image2text_recall_at_k()
 
         logger.info(
-            f"Current best image to text recall at K is: {-evaluator_val.best_image2text_recall_at_k}"
+            f"Current best image to text recall at {recall_at} is: "
+            f"{evaluator_val.best_image2text_recall_at_k}"
         )
 
-        return -evaluator_val.best_image2text_recall_at_k
+        return -sum(evaluator_val.best_image2text_recall_at_k)
 
 
 class PascalHparamsFinder(BaseHparamsFinder):
@@ -273,7 +266,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
         prefetch_size: int,
         imagenet_checkpoint_path: str,
         epochs: int,
-        recall_at: int,
     ):
         """Creates a finder that will find the best hyperparameters for the Pascal
         sentences datasets.
@@ -285,12 +277,9 @@ class PascalHparamsFinder(BaseHparamsFinder):
             prefetch_size: The prefetching size when running on GPU.
             imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
-            recall_at: Recall at K (this is K) evaluation metric.
         """
 
-        super().__init__(
-            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
-        )
+        super().__init__(batch_size, prefetch_size, imagenet_checkpoint_path, epochs)
         self.images_path = images_path
         self.texts_path = texts_path
 
@@ -391,11 +380,12 @@ class PascalHparamsFinder(BaseHparamsFinder):
                 except tf.errors.OutOfRangeError:
                     pass
 
-                if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
+                if evaluator_val.is_best_image2text_recall_at_k(recall_at):
                     evaluator_val.update_best_image2text_recall_at_k()
 
         logger.info(
-            f"Current best image to text recall at K is: {-evaluator_val.best_image2text_recall_at_k}"
+            f"Current best image to text recall at {recall_at} is: "
+            f"{evaluator_val.best_image2text_recall_at_k}"
         )
 
-        return -evaluator_val.best_image2text_recall_at_k
+        return -sum(evaluator_val.best_image2text_recall_at_k)

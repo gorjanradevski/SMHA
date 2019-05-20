@@ -172,7 +172,7 @@ def test_joint_attention(rnn_hidden_size, attn_size, attn_heads, encoded_input):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[5, 10, 100])
     attention = Text2ImageMatchingModel.join_attention_graph(
-        attn_size, attn_heads, input_layer
+        attn_size, attn_heads, input_layer, "siamese_attention"
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
