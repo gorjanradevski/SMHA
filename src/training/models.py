@@ -271,7 +271,9 @@ class Text2ImageMatchingModel:
         )
 
     def compute_loss(self, margin: float, attn_heads: int) -> tf.Tensor:
-        """Computes the triplet loss.
+        """Computes the triplet loss based on:
+
+        https://arxiv.org/pdf/1707.05612.pdf
 
         1. Computes the triplet loss between the image and text embeddings.
         2. Computes the Frob norm of the of the AA^T - I (image embeddings).
@@ -295,10 +297,10 @@ class Text2ImageMatchingModel:
 
             # Compare every diagonal score to scores in its column
             # All contrastive images for each sentence
-            cost_s = tf.maximum(0.0, margin - diagonal + scores)
+            cost_s = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
             # Compare every diagonal score to scores in its row
             # All contrastive sentences for each image
-            cost_im = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
+            cost_im = tf.maximum(0.0, margin - diagonal + scores)
 
             # Clear diagonals
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
