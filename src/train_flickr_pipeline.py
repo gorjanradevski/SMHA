@@ -9,7 +9,6 @@ from training.hyperparameters import YParams
 from training.loaders import TrainValLoader
 from training.models import Text2ImageMatchingModel
 from training.evaluators import Evaluator
-from utils.constants import recall_at
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,6 +23,7 @@ def train(
     train_imgs_file_path: str,
     val_imgs_file_path: str,
     epochs: int,
+    recall_at: int,
     batch_size: int,
     prefetch_size: int,
     checkpoint_path: str,
@@ -40,6 +40,7 @@ def train(
         train_imgs_file_path: Path to a file with the train image names.
         val_imgs_file_path: Path to a file with the val image names.
         epochs: The number of epochs to train the model.
+        recall_at: Validate on recall at K.
         batch_size: The batch size to be used.
         prefetch_size: How many batches to keep on GPU ready for processing.
         checkpoint_path: Path to a valid model checkpoint.
@@ -182,9 +183,7 @@ def train(
                 feed_dict={
                     model.val_loss_ph: evaluator_val.loss,
                     # Log recall at 10
-                    model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k[
-                        2
-                    ],
+                    model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k,
                 },
             )
             model.add_summary(sess, val_loss_summary)
@@ -202,6 +201,7 @@ def main():
         args.train_imgs_file_path,
         args.val_imgs_file_path,
         args.epochs,
+        args.recall_at,
         args.batch_size,
         args.prefetch_size,
         args.checkpoint_path,
@@ -280,6 +280,9 @@ def parse_args():
         type=int,
         default=10,
         help="The number of epochs to train the model.",
+    )
+    parser.add_argument(
+        "--recall_at", type=int, default=10, help="Validate on recall at K."
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."

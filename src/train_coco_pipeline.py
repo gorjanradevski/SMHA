@@ -9,7 +9,6 @@ from training.hyperparameters import YParams
 from training.loaders import TrainValLoader
 from training.models import Text2ImageMatchingModel
 from training.evaluators import Evaluator
-from utils.constants import recall_at
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,6 +23,7 @@ def train(
     val_images_path: str,
     val_json_path: str,
     epochs: int,
+    recall_at: int,
     batch_size: int,
     prefetch_size: int,
     checkpoint_path: str,
@@ -40,6 +40,7 @@ def train(
         val_images_path: The path to the validation images.
         val_json_path: The path to the validation annotations.
         epochs: The number of epochs to train the model.
+        recall_at: The recall at K.
         batch_size: The batch size to be used.
         prefetch_size: The size of the prefetch on gpu.
         checkpoint_path: Path to a valid model checkpoint.
@@ -181,9 +182,7 @@ def train(
                 feed_dict={
                     model.val_loss_ph: evaluator_val.loss,
                     # Log recall at 10
-                    model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k[
-                        2
-                    ],
+                    model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k,
                 },
             )
             model.add_summary(sess, val_loss_summary)
@@ -201,6 +200,7 @@ def main():
         args.val_images_path,
         args.val_json_path,
         args.epochs,
+        args.recall_at,
         args.batch_size,
         args.prefetch_size,
         args.checkpoint_path,
@@ -281,6 +281,9 @@ def parse_args():
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."
+    )
+    parser.add_argument(
+        "--recall_at", type=int, default=10, help="Validate on recall at K."
     )
     parser.add_argument(
         "--prefetch_size", type=int, default=5, help="The size of prefetch on gpu."

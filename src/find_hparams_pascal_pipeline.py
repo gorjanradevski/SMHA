@@ -14,6 +14,7 @@ def optimize(
     prefetch_size: int,
     imagenet_checkpoint_path: str,
     epochs: int,
+    recall_at: int,
     num_iters: int,
     hparams_path: str,
     trials_path: str,
@@ -28,6 +29,7 @@ def optimize(
         prefetch_size: The prefetching size when running on GPU.
         imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
         epochs: The number of epochs per experiment.
+        recall_at: Validate on recall at K.
         num_iters: How many times to do random sampling.
         hparams_path: Where to dump the hparams.
         trials_path: Read/write the trials object.
@@ -43,6 +45,7 @@ def optimize(
         prefetch_size,
         imagenet_checkpoint_path,
         epochs,
+        recall_at,
     )
     hparams_finder.find_best(num_iters, hparams_path, trials_path)
 
@@ -58,6 +61,7 @@ def main():
         args.prefetch_size,
         args.checkpoint_path,
         args.epochs,
+        args.recall_at,
         args.num_iters,
         args.hparams_path,
         args.trials_path,
@@ -102,6 +106,9 @@ def parse_args():
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."
+    )
+    parser.add_argument(
+        "--recall_at", type=int, default=10, help="Find best hparams on recall at K."
     )
     parser.add_argument(
         "--prefetch_size", type=int, default=5, help="The size of prefetch on gpu."

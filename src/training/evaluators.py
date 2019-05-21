@@ -1,7 +1,6 @@
 import sys
 import logging
 import numpy as np
-from typing import List
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,10 +10,10 @@ class Evaluator:
     def __init__(self, num_samples: int = 0, num_features: int = 0):
         self.loss = 0.0
         self.best_loss = sys.maxsize
-        self.best_image2text_recall_at_k = [-1.0 for _ in range(3)]
-        self.cur_image2text_recall_at_k = [-1.0 for _ in range(3)]
-        self.best_text2image_recall_at_k = [-1.0 for _ in range(3)]
-        self.cur_text2image_recall_at_k = [-1.0 for _ in range(3)]
+        self.best_image2text_recall_at_k = -1.0
+        self.cur_image2text_recall_at_k = -1.0
+        self.best_text2image_recall_at_k = -1.0
+        self.cur_text2image_recall_at_k = -1.0
         self.index_update = 0
         self.num_samples = num_samples
         self.num_features = num_features
@@ -26,8 +25,8 @@ class Evaluator:
         self.index_update = 0
         self.embedded_images = np.zeros((self.num_samples, self.num_features))
         self.embedded_captions = np.zeros((self.num_samples, self.num_features))
-        self.cur_text2image_recall_at_k = [-1.0 for _ in range(3)]
-        self.cur_image2text_recall_at_k = [-1.0 for _ in range(3)]
+        self.cur_text2image_recall_at_k = -1.0
+        self.cur_image2text_recall_at_k = -1.0
 
     def update_metrics(self, loss: float) -> None:
         self.loss += loss
@@ -52,33 +51,33 @@ class Evaluator:
     def update_best_loss(self):
         self.best_loss = self.loss
 
-    def is_best_image2text_recall_at_k(self, ks: List[int]) -> bool:
-        self.cur_image2text_recall_at_k = self.image2text_recall_at_k(ks)
-        if sum(self.cur_image2text_recall_at_k) > sum(self.best_image2text_recall_at_k):
+    def is_best_image2text_recall_at_k(self, k: int) -> bool:
+        self.cur_image2text_recall_at_k = self.image2text_recall_at_k(k)
+        if self.cur_image2text_recall_at_k > self.best_image2text_recall_at_k:
             return True
         return False
 
     def update_best_image2text_recall_at_k(self):
         self.best_image2text_recall_at_k = self.cur_image2text_recall_at_k
 
-    def is_best_text2image_recall_at_k(self, ks: List[int]) -> bool:
-        self.cur_text2image_recall_at_k = self.text2image_recall_at_k(ks)
-        if sum(self.cur_text2image_recall_at_k) > sum(self.best_text2image_recall_at_k):
+    def is_best_text2image_recall_at_k(self, k: int) -> bool:
+        self.cur_text2image_recall_at_k = self.text2image_recall_at_k(k)
+        if self.cur_text2image_recall_at_k > self.best_text2image_recall_at_k:
             return True
         return False
 
     def update_best_text2image_recall_at_k(self):
         self.best_text2image_recall_at_k = self.cur_text2image_recall_at_k
 
-    def image2text_recall_at_k(self, ks: List[int]) -> List[float]:
+    def image2text_recall_at_k(self, k: int) -> float:
         """Computes the recall at K when doing image to text retrieval and updates the
         object variable.
 
         Args:
-            ks: A list of Ks to compute recall at K (this is K).
+            k: Recall at K (this is K).
 
         Returns:
-            A list of computed recalls at ks.
+            The recall at K.
 
         """
         num_images = self.embedded_images.shape[0] // 5
@@ -97,17 +96,17 @@ class Evaluator:
                     rank = tmp
             ranks[index] = rank
 
-        return [len(np.where(ranks < k)[0]) / len(ranks) for k in ks]
+        return len(np.where(ranks < k)[0]) / len(ranks)
 
-    def text2image_recall_at_k(self, ks: List[int]) -> List[float]:
+    def text2image_recall_at_k(self, k) -> float:
         """Computes the recall at K when doing text to image retrieval and updates the
         object variable.
 
         Args:
-            ks: A list of Ks to computerRecall at K (this is K).
+            k: Recall at K (this is K).
 
         Returns:
-            A list of computed recalls at ks.
+            The recall at K.
 
         """
         num_captions = self.embedded_captions.shape[0]
@@ -122,4 +121,4 @@ class Evaluator:
                 inds[i] = np.argsort(similarities[i])[::-1]
                 ranks[5 * index + i] = np.where(inds[i] == index)[0][0]
 
-        return [len(np.where(ranks < k)[0]) / len(ranks) for k in ks]
+        return len(np.where(ranks < k)[0]) / len(ranks)

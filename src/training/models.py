@@ -307,9 +307,9 @@ class Text2ImageMatchingModel:
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
             # For each positive pair (i,s) pick the hardest contrastive image
-            cost_s = tf.reduce_max(cost_s, axis=1)
+            # cost_s = tf.reduce_max(cost_s, axis=1)
             # For each positive pair (i,s) pick the hardest contrastive sentence
-            cost_im = tf.reduce_max(cost_im, axis=0)
+            # cost_im = tf.reduce_max(cost_im, axis=0)
 
             loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
