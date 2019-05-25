@@ -14,3 +14,4 @@ rnn_hidden_size: 134
 weight_decay: 3.502128988823965e-05
 name: JTKFQ
 seed: 439265
+batch_hard: false

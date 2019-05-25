@@ -14,3 +14,4 @@ attn_heads: 1
 frob_norm_pen: 1
 gradient_clip_val: 5
 seed: 42
+batch_hard: false

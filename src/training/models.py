@@ -5,7 +5,6 @@ from typing import Tuple
 from training.cells import cell_factory
 from training.optimizers import optimizer_factory
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 slim = tf.contrib.slim
@@ -28,6 +27,7 @@ class Text2ImageMatchingModel:
         optimizer_type: str,
         learning_rate: float,
         clip_value: int,
+        batch_hard: bool,
         log_dir: str = "",
         name: str = "",
     ):
@@ -76,7 +76,7 @@ class Text2ImageMatchingModel:
             attn_size, attn_heads, self.text_encoded, "siamese_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_heads)
+        self.loss = self.compute_loss(margin, attn_heads, batch_hard)
         self.optimize = self.apply_gradients_op(
             self.loss, optimizer_type, learning_rate, clip_value
         )
@@ -104,7 +104,7 @@ class Text2ImageMatchingModel:
         """
         with tf.variable_scope("vgg_19", "vgg_19", [images]) as sc:
             end_points_collection = sc.original_name_scope + "_end_points"
-            # Collect outputs for conv2d, fully_connected and max_pool2d.
+            # Collect outputs for conv2d and max_pool2d.
             with slim.arg_scope(
                 [slim.conv2d, slim.max_pool2d],
                 outputs_collections=end_points_collection,
@@ -270,7 +270,9 @@ class Text2ImageMatchingModel:
             )
         )
 
-    def compute_loss(self, margin: float, attn_heads: int) -> tf.Tensor:
+    def compute_loss(
+        self, margin: float, attn_heads: int, batch_hard: bool
+    ) -> tf.Tensor:
         """Computes the triplet loss based on:
 
         https://arxiv.org/pdf/1707.05612.pdf
@@ -284,6 +286,7 @@ class Text2ImageMatchingModel:
         Args:
             margin: The contrastive margin.
             attn_heads: The number of attention hops.
+            batch_hard: Whether to train only on hard negatives.
 
         Returns:
             The triplet loss using the batch-hard strategy.
@@ -306,10 +309,11 @@ class Text2ImageMatchingModel:
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-            # For each positive pair (i,s) pick the hardest contrastive image
-            # cost_s = tf.reduce_max(cost_s, axis=1)
-            # For each positive pair (i,s) pick the hardest contrastive sentence
-            # cost_im = tf.reduce_max(cost_im, axis=0)
+            if batch_hard:
+                # For each positive pair (i,s) pick the hardest contrastive image
+                cost_s = tf.reduce_max(cost_s, axis=1)
+                # For each positive pair (i,s) pick the hardest contrastive sentence
+                cost_im = tf.reduce_max(cost_im, axis=0)
 
             loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 

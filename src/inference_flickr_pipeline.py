@@ -9,7 +9,7 @@ from training.hyperparameters import YParams
 from training.loaders import TestLoader
 from training.models import Text2ImageMatchingModel
 from training.evaluators import Evaluator
-from utils.constants import recall_at
+from utils.constants import inference_for_recall_at
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -84,6 +84,7 @@ def inference(
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
+        hparams.batch_hard,
     )
     logger.info("Model created...")
     logger.info("Inference is starting...")
@@ -109,10 +110,11 @@ def inference(
         except tf.errors.OutOfRangeError:
             pass
 
-        logger.info(
-            f"The recall at {recall_at} is: "
-            f"{evaluator_test.image2text_recall_at_k(recall_at)}"
-        )
+        for recall_at in inference_for_recall_at:
+            logger.info(
+                f"The recall at {recall_at} is: "
+                f"{evaluator_test.image2text_recall_at_k(recall_at)}"
+            )
 
 
 def main():

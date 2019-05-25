@@ -72,6 +72,7 @@ class BaseHparamsFinder(ABC):
             "attn_heads": hp.choice("attn_heads", range(1, 50)),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
             "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
+            "batch_hard": hp.choice("batch_hard", [True, False]),
         }
 
     @abstractmethod
@@ -171,6 +172,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
         weight_decay = args["weight_decay"]
+        batch_hard = args["batch_hard"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
@@ -214,6 +216,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             opt,
             learning_rate,
             gradient_clip_val,
+            batch_hard,
         )
 
         with tf.Session() as sess:
@@ -308,6 +311,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
         weight_decay = args["weight_decay"]
+        batch_hard = args["batch_hard"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = (
@@ -350,6 +354,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
             opt,
             learning_rate,
             gradient_clip_val,
+            batch_hard,
         )
 
         with tf.Session() as sess:

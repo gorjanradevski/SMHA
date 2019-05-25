@@ -23,7 +23,7 @@ class BaseLoader(ABC):
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
         image = tf.cast(image, tf.float32)
-        smallest_side = 256.0  # Max for VGG16
+        smallest_side = 256.0  # Max for VGG19
         height, width = tf.shape(image)[0], tf.shape(image)[1]
         height = tf.cast(height, tf.float32)
         width = tf.cast(width, tf.float32)
@@ -36,6 +36,27 @@ class BaseLoader(ABC):
         new_height = tf.cast(height * scale, tf.float32)
         new_width = tf.cast(width * scale, tf.float32)
         image = tf.image.resize_images(image, [new_height, new_width])
+
+        return image, caption, caption_len
+
+    @staticmethod
+    def parse_data_train(
+        image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        image = tf.random_crop(image, [WIDTH, HEIGHT, NUM_CHANNELS])
+        image = tf.image.random_flip_left_right(image)
+        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
+        image = image - means
+
+        return image, caption, caption_len
+
+    @staticmethod
+    def parse_data_val_test(
+        image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor
+    ):
+        image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
+        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
+        image = image - means
 
         return image, caption, caption_len
 
@@ -95,7 +116,7 @@ class TrainValLoader(BaseLoader):
             self.parse_data, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.val_dataset = self.val_dataset.map(
-            self.parse_data_val, num_parallel_calls=tf.data.experimental.AUTOTUNE
+            self.parse_data_val_test, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.val_dataset = self.val_dataset.padded_batch(
             self.batch_size,
@@ -113,25 +134,6 @@ class TrainValLoader(BaseLoader):
         self.val_init = self.iterator.make_initializer(self.val_dataset)
 
         logger.info("Iterator created...")
-
-    @staticmethod
-    def parse_data_train(
-        image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        image = tf.random_crop(image, [WIDTH, HEIGHT, NUM_CHANNELS])
-        image = tf.image.random_flip_left_right(image)
-        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
-        image = image - means
-
-        return image, caption, caption_len
-
-    @staticmethod
-    def parse_data_val(image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor):
-        image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
-        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
-        image = image - means
-
-        return image, caption, caption_len
 
     def train_data_generator(self) -> Generator[tf.Tensor, None, None]:
         for image_path, caption, caption_len in zip(
@@ -177,7 +179,7 @@ class TestLoader(BaseLoader):
             self.parse_data, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.test_dataset = self.test_dataset.map(
-            self.parse_data_test, num_parallel_calls=tf.data.experimental.AUTOTUNE
+            self.parse_data_val_test, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
         self.test_dataset = self.test_dataset.padded_batch(
             self.batch_size,
@@ -194,14 +196,6 @@ class TestLoader(BaseLoader):
             self.test_image_paths, self.test_captions, self.test_captions_lengths
         ):
             yield image_path, caption, caption_len
-
-    @staticmethod
-    def parse_data_test(image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor):
-        image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
-        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
-        image = image - means
-
-        return image, caption, caption_len
 
     def get_next(self) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         images, captions, captions_lengths = self.iterator.get_next()

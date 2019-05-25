@@ -102,6 +102,7 @@ def train(
         hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
+        hparams.batch_hard,
         log_model_path,
         hparams.name,
     )
