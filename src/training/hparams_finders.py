@@ -67,7 +67,7 @@ class BaseHparamsFinder(ABC):
                 "learning_rate", np.log(0.000_001), np.log(0.01)
             ),
             "opt": hp.choice("opt", ["adam", "sgd", "rmsprop"]),
-            "margin": hp.uniform("margin", 0.01, 5),
+            "margin": hp.uniform("margin", 0.01, 50),
             "attn_size": hp.choice("attn_size", range(20, 50)),
             "attn_heads": hp.choice("attn_heads", range(1, 50)),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
