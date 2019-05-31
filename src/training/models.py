@@ -129,13 +129,12 @@ class Text2ImageMatchingModel:
                     net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
                 )
 
-        flatten = tf.reshape(net, (-1, net.shape[3]))
-        project_layer = tf.layers.dense(flatten, 2 * rnn_hidden_size)
-        reshaped = tf.reshape(
-            project_layer, (-1, net.shape[1] * net.shape[2], 2 * rnn_hidden_size)
-        )
+        project_layer = slim.conv2d(net, rnn_hidden_size, [3, 3], scope="project_layer")
 
-        return reshaped
+        return tf.reshape(
+            project_layer,
+            (-1, project_layer.shape[1] * project_layer.shape[2], rnn_hidden_size),
+        )
 
     @staticmethod
     def text_encoder_graph(
@@ -179,7 +178,7 @@ class Text2ImageMatchingModel:
                 cell_fw, cell_bw, inputs, sequence_length=captions_len, dtype=tf.float32
             )
 
-            return tf.concat([output_fw, output_bw], axis=2)
+            return tf.add(output_fw, output_bw) / 2
 
     @staticmethod
     def join_attention_graph(
@@ -232,15 +231,15 @@ class Text2ImageMatchingModel:
             v = tf.tanh(tf.matmul(encoded_input_reshaped, w_omega) + b_omega)
             # [B * T, A_hops]
             vu = tf.matmul(v, u_omega)
-            # [B, T, A_hops]
+            # [B, T, A_heads]
             vu = tf.reshape(vu, [-1, time_steps, attn_heads])
-            # [B, A_hops, T]
+            # [B, A_heads, T]
             vu_transposed = tf.transpose(vu, [0, 2, 1])
-            # [B, A_hops, T]
+            # [B, A_heads, T]
             alphas = tf.nn.softmax(vu_transposed, name="alphas", axis=2)
-            # [B, A_hops, H]
+            # [B, A_heads, H]
             output = tf.matmul(alphas, encoded_input)
-            # [B, A_hops * H]
+            # [B, A_heads * H]
             output = tf.layers.flatten(output)
 
             return output, alphas
@@ -251,7 +250,7 @@ class Text2ImageMatchingModel:
 
         Args:
             attention_weights: The attention weights.
-            attn_heads: The number of attention hops
+            attn_heads: The number of attention hops.
 
         Returns:
             The Frobenius norm of the attention weights tensor.

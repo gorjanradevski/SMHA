@@ -104,6 +104,11 @@ def frob_norm_pen():
     return 1
 
 
+@pytest.fixture
+def batch_hard():
+    return False
+
+
 def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
@@ -116,7 +121,7 @@ def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
             image_encoded, feed_dict={input_layer: input_images_image_encoder}
         ).shape
     assert output_shape[0] == 50
-    assert output_shape[2] == 2 * rnn_hidden_size
+    assert output_shape[2] == rnn_hidden_size
 
 
 def test_image_encoder_batch_size_invariance(
@@ -165,12 +170,13 @@ def test_text_encoder(
         outputs = sess.run(text_encoded).shape
     assert outputs[0] == 3
     assert outputs[1] == 5
-    assert outputs[2] == 2 * rnn_hidden_size
+    assert outputs[2] == rnn_hidden_size
 
 
-def test_joint_attention(rnn_hidden_size, attn_size, attn_heads, encoded_input):
+def test_joint_attention(attn_size, attn_heads, encoded_input):
     tf.reset_default_graph()
-    input_layer = tf.placeholder(dtype=tf.float32, shape=[5, 10, 100])
+    encoded_input_shape = encoded_input.shape
+    input_layer = tf.placeholder(dtype=tf.float32, shape=encoded_input_shape)
     attention = Text2ImageMatchingModel.join_attention_graph(
         attn_size, attn_heads, input_layer, "siamese_attention"
     )
@@ -180,7 +186,10 @@ def test_joint_attention(rnn_hidden_size, attn_size, attn_heads, encoded_input):
             attention, feed_dict={input_layer: encoded_input}
         )
         assert attended_input.shape[0] == 5
-        assert attended_input.shape[1] == rnn_hidden_size * 2 * attn_heads
+        assert attended_input.shape[1] == attn_heads * encoded_input_shape[2]
+        assert alphas.shape[0] == encoded_input_shape[0]
+        assert alphas.shape[1] == attn_heads
+        assert alphas.shape[2] == encoded_input_shape[1]
 
 
 def test_attended_image_text_shape(
@@ -198,6 +207,7 @@ def test_attended_image_text_shape(
     optimizer_type,
     learning_rate,
     clip_value,
+    batch_hard,
 ):
     tf.reset_default_graph()
     model = Text2ImageMatchingModel(
@@ -215,6 +225,7 @@ def test_attended_image_text_shape(
         optimizer_type,
         learning_rate,
         clip_value,
+        batch_hard,
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]
