@@ -1,7 +1,7 @@
 import argparse
 import os
 import tensorflow as tf
-from img2text_matching.hparams_finders import PascalHparamsFinder
+from img2text_matching.hyperparameters import PascalHparamsFinder
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 tf.logging.set_verbosity(tf.logging.ERROR)
