@@ -4,11 +4,11 @@ import logging
 from tqdm import tqdm
 import os
 
-from training.datasets import FlickrDataset, get_vocab_size
-from training.hyperparameters import YParams
-from training.loaders import TrainValLoader
-from training.models import Text2ImageMatchingModel
-from training.evaluators import Evaluator
+from img2text_matching.datasets import FlickrDataset, get_vocab_size
+from img2text_matching.hyperparameters import YParams
+from img2text_matching.loaders import TrainValLoader
+from img2text_matching.models import Text2ImageMatchingModel
+from img2text_matching.evaluators import Evaluator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def train(
     save_model_path: str,
     log_model_path: str,
 ) -> None:
-    """Starts a training session with the Flickr8k dataset.
+    """Starts a img2text_matching session with the Flickr8k dataset.
 
     Args:
         hparams_path: The path to the hyperparameters yaml file.
@@ -95,12 +95,9 @@ def train(
         hparams.margin,
         hparams.rnn_hidden_size,
         get_vocab_size(FlickrDataset),
-        hparams.embed_size,
-        hparams.cell,
         hparams.layers,
         hparams.attn_size,
         hparams.attn_heads,
-        hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
         hparams.batch_hard,
@@ -121,7 +118,7 @@ def train(
             evaluator_train.reset_all_vars()
             evaluator_val.reset_all_vars()
 
-            # Initialize iterator with training data
+            # Initialize iterator with img2text_matching data
             sess.run(loader.train_init)
             try:
                 with tqdm(total=len(train_image_paths)) as pbar:
@@ -171,7 +168,7 @@ def train(
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
 
-            # Write training summaries
+            # Write img2text_matching summaries
             train_loss_summary = sess.run(
                 model.train_loss_summary,
                 feed_dict={model.train_loss_ph: evaluator_train.loss},
@@ -220,7 +217,7 @@ def parse_args():
 
     """
     parser = argparse.ArgumentParser(
-        description="Performs training on the Flickr8k and Flicrk30k dataset."
+        description="Performs img2text_matching on the Flickr8k and Flicrk30k dataset."
         "Defaults to the Flickr8k dataset."
     )
     parser.add_argument(

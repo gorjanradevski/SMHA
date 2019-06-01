@@ -78,7 +78,7 @@ class TrainValLoader(BaseLoader):
         prefetch_size: int,
     ):
         super().__init__(batch_size, prefetch_size)
-        # Build training dataset
+        # Build img2text_matching dataset
         self.train_image_paths = train_image_paths
         self.train_captions = train_captions
         self.train_captions_lengths = train_captions_lengths

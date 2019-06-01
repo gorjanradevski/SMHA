@@ -2,8 +2,7 @@ import tensorflow as tf
 import logging
 from typing import Tuple
 
-from training.cells import cell_factory
-from training.optimizers import optimizer_factory
+from utils.constants import embedding_size
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,12 +18,9 @@ class Text2ImageMatchingModel:
         margin: float,
         rnn_hidden_size: int,
         vocab_size: int,
-        embedding_size: int,
-        cell_type: str,
         num_layers: int,
         attn_size: int,
         attn_heads: int,
-        optimizer_type: str,
         learning_rate: float,
         clip_value: int,
         batch_hard: bool,
@@ -61,8 +57,6 @@ class Text2ImageMatchingModel:
             self.captions,
             self.captions_len,
             vocab_size,
-            embedding_size,
-            cell_type,
             rnn_hidden_size,
             num_layers,
             self.keep_prob,
@@ -77,9 +71,7 @@ class Text2ImageMatchingModel:
         )
         logger.info("Attention graph created...")
         self.loss = self.compute_loss(margin, attn_heads, batch_hard)
-        self.optimize = self.apply_gradients_op(
-            self.loss, optimizer_type, learning_rate, clip_value
-        )
+        self.optimize = self.apply_gradients_op(self.loss, learning_rate, clip_value)
         # ImageNet graph loader and graph saver/loader
         self.image_encoder_loader = tf.train.Saver(
             tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_19")
@@ -129,11 +121,11 @@ class Text2ImageMatchingModel:
                     net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
                 )
 
-        project_layer = slim.conv2d(net, rnn_hidden_size, [3, 3], scope="project_layer")
+        flatten = tf.reshape(net, (-1, net.shape[3]))
+        project_layer = tf.layers.dense(flatten, rnn_hidden_size)
 
         return tf.reshape(
-            project_layer,
-            (-1, project_layer.shape[1] * project_layer.shape[2], rnn_hidden_size),
+            project_layer, (-1, net.shape[1] * net.shape[2], rnn_hidden_size)
         )
 
     @staticmethod
@@ -141,8 +133,6 @@ class Text2ImageMatchingModel:
         captions: tf.Tensor,
         captions_len: tf.Tensor,
         vocab_size: int,
-        embedding_size: int,
-        cell_type: str,
         rnn_hidden_size: int,
         num_layers: int,
         keep_prob: float,
@@ -153,8 +143,6 @@ class Text2ImageMatchingModel:
             captions: The inputs.
             captions_len: The length of the inputs.
             vocab_size: The size of the vocabulary.
-            embedding_size: The size of the embedding layer.
-            cell_type: The cell type.
             rnn_hidden_size: The size of the weight matrix in the cell.
             num_layers: The number of layers of the rnn.
             keep_prob: The dropout probability (1.0 means keep everything)
@@ -172,8 +160,24 @@ class Text2ImageMatchingModel:
                 name="embeddings",
             )
             inputs = tf.nn.embedding_lookup(embeddings, captions)
-            cell_fw = cell_factory(cell_type, rnn_hidden_size, num_layers, keep_prob)
-            cell_bw = cell_factory(cell_type, rnn_hidden_size, num_layers, keep_prob)
+            cell_fw = tf.nn.rnn_cell.MultiRNNCell(
+                [
+                    tf.nn.rnn_cell.DropoutWrapper(
+                        tf.nn.rnn_cell.GRUCell(rnn_hidden_size),
+                        output_keep_prob=keep_prob,
+                    )
+                    for _ in range(num_layers)
+                ]
+            )
+            cell_bw = tf.nn.rnn_cell.MultiRNNCell(
+                [
+                    tf.nn.rnn_cell.DropoutWrapper(
+                        tf.nn.rnn_cell.GRUCell(rnn_hidden_size),
+                        output_keep_prob=keep_prob,
+                    )
+                    for _ in range(num_layers)
+                ]
+            )
             (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
                 cell_fw, cell_bw, inputs, sequence_length=captions_len, dtype=tf.float32
             )
@@ -339,17 +343,12 @@ class Text2ImageMatchingModel:
             return loss + l2 + pen_image_alphas + pen_text_alphas
 
     def apply_gradients_op(
-        self,
-        loss: tf.Tensor,
-        optimizer_type: str,
-        learning_rate: float,
-        clip_value: int,
+        self, loss: tf.Tensor, learning_rate: float, clip_value: int
     ) -> tf.Operation:
         """Applies the gradients on the variables.
 
         Args:
             loss: The computed loss.
-            optimizer_type: The type of the optimizer.
             learning_rate: The optimizer learning rate.
             clip_value: The clipping value.
 
@@ -358,7 +357,7 @@ class Text2ImageMatchingModel:
 
         """
         with tf.variable_scope(name_or_scope="optimizer"):
-            optimizer = optimizer_factory(optimizer_type, learning_rate)
+            optimizer = tf.train.AdamOptimizer(learning_rate)
             gradients, variables = zip(*optimizer.compute_gradients(loss))
             gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
 

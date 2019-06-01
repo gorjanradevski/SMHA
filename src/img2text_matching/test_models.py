@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 
-from training.models import Text2ImageMatchingModel
+from img2text_matching.models import Text2ImageMatchingModel
 
 
 @pytest.fixture
@@ -49,16 +49,6 @@ def vocab_size():
 
 
 @pytest.fixture
-def embedding_size():
-    return 5
-
-
-@pytest.fixture
-def cell_type():
-    return "lstm"
-
-
-@pytest.fixture
 def num_layers():
     return 2
 
@@ -77,11 +67,6 @@ def attn_size():
 def encoded_input():
     np.random.seed(42)
     return np.random.rand(5, 10, 100).astype(np.float32)
-
-
-@pytest.fixture
-def optimizer_type():
-    return "adam"
 
 
 @pytest.fixture
@@ -145,25 +130,11 @@ def test_image_encoder_batch_size_invariance(
 
 
 def test_text_encoder(
-    captions,
-    captions_len,
-    vocab_size,
-    embedding_size,
-    cell_type,
-    rnn_hidden_size,
-    num_layers,
-    keep_prob,
+    captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
 ):
     tf.reset_default_graph()
     text_encoded = Text2ImageMatchingModel.text_encoder_graph(
-        captions,
-        captions_len,
-        vocab_size,
-        embedding_size,
-        cell_type,
-        rnn_hidden_size,
-        num_layers,
-        keep_prob,
+        captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -199,12 +170,9 @@ def test_attended_image_text_shape(
     margin,
     rnn_hidden_size,
     vocab_size,
-    embedding_size,
-    cell_type,
     num_layers,
     attn_size,
     attn_heads,
-    optimizer_type,
     learning_rate,
     clip_value,
     batch_hard,
@@ -217,12 +185,9 @@ def test_attended_image_text_shape(
         margin,
         rnn_hidden_size,
         vocab_size,
-        embedding_size,
-        cell_type,
         num_layers,
         attn_size,
         attn_heads,
-        optimizer_type,
         learning_rate,
         clip_value,
         batch_hard,

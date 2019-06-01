@@ -2,7 +2,7 @@ import pytest
 import tensorflow as tf
 import numpy as np
 
-from training.loaders import TrainValLoader, TestLoader
+from img2text_matching.loaders import TrainValLoader, TestLoader
 
 
 @pytest.fixture

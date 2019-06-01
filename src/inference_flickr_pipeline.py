@@ -4,11 +4,11 @@ import logging
 from tqdm import tqdm
 import os
 
-from training.datasets import FlickrDataset, get_vocab_size
-from training.hyperparameters import YParams
-from training.loaders import TestLoader
-from training.models import Text2ImageMatchingModel
-from training.evaluators import Evaluator
+from img2text_matching.datasets import FlickrDataset, get_vocab_size
+from img2text_matching.hyperparameters import YParams
+from img2text_matching.loaders import TestLoader
+from img2text_matching.models import Text2ImageMatchingModel
+from img2text_matching.evaluators import Evaluator
 from utils.constants import inference_for_recall_at
 
 logging.basicConfig(level=logging.INFO)
@@ -76,12 +76,9 @@ def inference(
         hparams.margin,
         hparams.rnn_hidden_size,
         get_vocab_size(FlickrDataset),
-        hparams.embed_size,
-        hparams.cell,
         hparams.layers,
         hparams.attn_size,
         hparams.attn_heads,
-        hparams.opt,
         hparams.learning_rate,
         hparams.gradient_clip_val,
         hparams.batch_hard,

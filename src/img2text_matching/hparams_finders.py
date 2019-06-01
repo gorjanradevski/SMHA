@@ -11,15 +11,19 @@ import logging
 import pickle
 import sys
 
-from training.datasets import FlickrDataset, PascalSentencesDataset, get_vocab_size
-from training.models import Text2ImageMatchingModel
-from training.loaders import TrainValLoader
-from training.evaluators import Evaluator
+from img2text_matching.datasets import (
+    FlickrDataset,
+    PascalSentencesDataset,
+    get_vocab_size,
+)
+from img2text_matching.models import Text2ImageMatchingModel
+from img2text_matching.loaders import TrainValLoader
+from img2text_matching.evaluators import Evaluator
 
-logging.getLogger("training.datasets").setLevel(logging.ERROR)
-logging.getLogger("training.models").setLevel(logging.ERROR)
-logging.getLogger("training.loaders").setLevel(logging.ERROR)
-logging.getLogger("training.evaluators").setLevel(logging.ERROR)
+logging.getLogger("img2text_matching.datasets").setLevel(logging.ERROR)
+logging.getLogger("img2text_matching.models").setLevel(logging.ERROR)
+logging.getLogger("img2text_matching.loaders").setLevel(logging.ERROR)
+logging.getLogger("img2text_matching.evaluators").setLevel(logging.ERROR)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,19 +61,16 @@ class BaseHparamsFinder(ABC):
         # Define the search space
         self.search_space = {
             "min_unk_sub": hp.choice("min_unk_sub", range(3, 10)),
-            "embed_size": hp.choice("embed_size", range(200, 400)),
             "layers": hp.choice("layers", range(1, 3)),
-            "rnn_hidden_size": hp.choice("rnn_hidden_size", range(128, 256)),
-            "cell": hp.choice("cell", ["lstm", "gru"]),
-            "keep_prob": hp.uniform("keep_prob", 0.5, 1.0),
-            "weight_decay": hp.loguniform("wd", np.log(0.000_001), np.log(0.01)),
+            "rnn_hidden_size": hp.choice("rnn_hidden_size", [128, 256, 512]),
+            "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
+            "weight_decay": hp.loguniform("wd", np.log(0.00001), np.log(0.01)),
             "learning_rate": hp.loguniform(
-                "learning_rate", np.log(0.000_001), np.log(0.01)
+                "learning_rate", np.log(0.00001), np.log(0.01)
             ),
-            "opt": hp.choice("opt", ["adam", "sgd", "rmsprop"]),
-            "margin": hp.uniform("margin", 0.01, 50),
-            "attn_size": hp.choice("attn_size", range(20, 100)),
-            "attn_heads": hp.choice("attn_heads", range(20, 50)),
+            "margin": hp.choice("margin", range(1, 100, 5)),
+            "attn_size": hp.choice("attn_size", range(20, 100, 5)),
+            "attn_heads": hp.choice("attn_heads", range(20, 50, 5)),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
             "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
             "batch_hard": hp.choice("batch_hard", [True, False]),
@@ -161,13 +162,10 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         min_unk_sub = args["min_unk_sub"]
         rnn_hidden_size = args["rnn_hidden_size"]
         margin = args["margin"]
-        embed_size = args["embed_size"]
-        cell = args["cell"]
         layers = args["layers"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
-        opt = args["opt"]
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
@@ -206,12 +204,9 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             margin,
             rnn_hidden_size,
             get_vocab_size(FlickrDataset),
-            embed_size,
-            cell,
             layers,
             attn_size,
             attn_heads,
-            opt,
             learning_rate,
             gradient_clip_val,
             batch_hard,
@@ -224,7 +219,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
 
-                # Initialize iterator with training data
+                # Initialize iterator with img2text_matching data
                 sess.run(loader.train_init)
                 try:
                     while True:
@@ -298,13 +293,10 @@ class PascalHparamsFinder(BaseHparamsFinder):
         min_unk_sub = args["min_unk_sub"]
         rnn_hidden_size = args["rnn_hidden_size"]
         margin = args["margin"]
-        embed_size = args["embed_size"]
-        cell = args["cell"]
         layers = args["layers"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
-        opt = args["opt"]
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
@@ -342,12 +334,9 @@ class PascalHparamsFinder(BaseHparamsFinder):
             margin,
             rnn_hidden_size,
             get_vocab_size(PascalSentencesDataset),
-            embed_size,
-            cell,
             layers,
             attn_size,
             attn_heads,
-            opt,
             learning_rate,
             gradient_clip_val,
             batch_hard,
@@ -360,7 +349,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
 
-                # Initialize iterator with training data
+                # Initialize iterator with img2text_matching data
                 sess.run(loader.train_init)
                 try:
                     while True:
