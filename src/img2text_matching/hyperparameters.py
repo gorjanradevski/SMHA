@@ -20,6 +20,7 @@ from img2text_matching.datasets import (
 from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.loaders import TrainValLoader
 from img2text_matching.evaluators import Evaluator
+from utils.git_utils import append_git_hash_on_file_path
 
 logging.getLogger("img2text_matching.datasets").setLevel(logging.ERROR)
 logging.getLogger("img2text_matching.models").setLevel(logging.ERROR)
@@ -101,6 +102,21 @@ class BaseHparamsFinder(ABC):
         pass
 
     def find_best(self, num_iters: int, hparams_path: str, trials_path: str) -> None:
+        """Searches for the best hyperparameters, where after each random sampling the
+        trials object is saved with the updated history.
+
+        Args:
+            num_iters: For many times to do random sampling.
+            hparams_path: Where to dump the hparams.
+            trials_path: Where to dump the trials object.
+
+        Returns:
+            None
+
+        """
+        # Append git commit hash to the paths
+        hparams_path = append_git_hash_on_file_path(hparams_path)
+        trials_path = append_git_hash_on_file_path(trials_path)
         for _ in range(num_iters):
             try:
                 trials = pickle.load(open(trials_path, "rb"))
