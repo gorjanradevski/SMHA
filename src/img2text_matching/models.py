@@ -94,6 +94,7 @@ class Text2ImageMatchingModel:
             The encoded image.
 
         """
+        # As per: https://arxiv.org/abs/1409.1556
         with tf.variable_scope("vgg_19", "vgg_19", [images]) as sc:
             end_points_collection = sc.original_name_scope + "_end_points"
             # Collect outputs for conv2d and max_pool2d.
@@ -122,10 +123,11 @@ class Text2ImageMatchingModel:
                 )
         with tf.variable_scope("image_encoder"):
             flatten = tf.reshape(net, (-1, net.shape[3]))
+            # As per: https://arxiv.org/abs/1502.01852
             project_layer = tf.layers.dense(
                 flatten,
                 rnn_hidden_size,
-                kernel_initializer=tf.glorot_uniform_initializer(),
+                kernel_initializer=tf.variance_scaling_initializer(),
                 activation=tf.nn.relu,
             )
 
@@ -157,13 +159,14 @@ class Text2ImageMatchingModel:
 
         """
         with tf.variable_scope(name_or_scope="text_encoder"):
-            # As per: https://arxiv.org/pdf/1711.09160.pdf
+            # As per: https://arxiv.org/abs/1711.09160
             embeddings = tf.get_variable(
                 name="embeddings",
                 shape=[vocab_size, embedding_size],
                 initializer=tf.random_normal_initializer(mean=0, stddev=0.001),
             )
             inputs = tf.nn.embedding_lookup(embeddings, captions)
+            # As per: https://arxiv.org/abs/1406.1078
             cell_fw = tf.nn.rnn_cell.MultiRNNCell(
                 [
                     tf.nn.rnn_cell.DropoutWrapper(
@@ -194,7 +197,7 @@ class Text2ImageMatchingModel:
     ):
         """Applies attention on the encoded image and the encoded text.
 
-        As per: https://arxiv.org/pdf/1703.03130.pdf
+        As per: https://arxiv.org/abs/1703.03130
 
         The "A structured self-attentative sentence embedding" paper goes through
         the attention mechanism applied here.
@@ -214,7 +217,7 @@ class Text2ImageMatchingModel:
             time_steps = tf.shape(encoded_input)[1]
             hidden_size = encoded_input.get_shape()[2].value
 
-            # As per: http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
+            # As per: http://proceedings.mlr.press/v9/glorot10a.html
             # Trainable parameters
             w_omega = tf.get_variable(
                 name="w_omega",
@@ -280,7 +283,7 @@ class Text2ImageMatchingModel:
     ) -> tf.Tensor:
         """Computes the triplet loss based on:
 
-        https://arxiv.org/pdf/1707.05612.pdf
+        https://arxiv.org/abs/1707.05612
 
         1. Computes the triplet loss between the image and text embeddings.
         2. Computes the Frob norm of the of the AA^T - I (image embeddings).
