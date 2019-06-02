@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 class YParams(HParams):
     def __init__(self, hparams_path: str):
+
         super().__init__()
         with open(hparams_path) as fp:
             for k, v in YAML().load(fp).items():
@@ -70,7 +71,7 @@ class BaseHparamsFinder(ABC):
         # Define the search space
         self.search_space = {
             "min_unk_sub": hp.choice("min_unk_sub", range(3, 10)),
-            "layers": hp.choice("layers", range(1, 3)),
+            "layers": hp.choice("layers", [1, 2, 3]),
             "rnn_hidden_size": hp.choice("rnn_hidden_size", [128, 256, 512]),
             "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
             "weight_decay": hp.loguniform("wd", np.log(0.00001), np.log(0.01)),

@@ -1,12 +1,12 @@
 import tensorflow as tf
 import logging
 from typing import Tuple
+from tensorflow.contrib import slim
 
 from utils.constants import embedding_size
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-slim = tf.contrib.slim
 
 
 class Text2ImageMatchingModel:
@@ -120,13 +120,18 @@ class Text2ImageMatchingModel:
                 net = slim.repeat(
                     net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
                 )
+        with tf.variable_scope("image_encoder"):
+            flatten = tf.reshape(net, (-1, net.shape[3]))
+            project_layer = tf.layers.dense(
+                flatten,
+                rnn_hidden_size,
+                kernel_initializer=tf.glorot_uniform_initializer(),
+                activation=tf.nn.relu,
+            )
 
-        flatten = tf.reshape(net, (-1, net.shape[3]))
-        project_layer = tf.layers.dense(flatten, rnn_hidden_size)
-
-        return tf.reshape(
-            project_layer, (-1, net.shape[1] * net.shape[2], rnn_hidden_size)
-        )
+            return tf.reshape(
+                project_layer, (-1, net.shape[1] * net.shape[2], rnn_hidden_size)
+            )
 
     @staticmethod
     def text_encoder_graph(
@@ -151,13 +156,12 @@ class Text2ImageMatchingModel:
             The encoded text.
 
         """
-        with tf.variable_scope("text_encoder"):
-            embeddings = tf.Variable(
-                tf.random_uniform(
-                    [vocab_size, embedding_size], -1.0, 1.0, dtype=tf.float32
-                ),
-                trainable=True,
+        with tf.variable_scope(name_or_scope="text_encoder"):
+            # As per: https://arxiv.org/pdf/1711.09160.pdf
+            embeddings = tf.get_variable(
                 name="embeddings",
+                shape=[vocab_size, embedding_size],
+                initializer=tf.random_normal_initializer(mean=0, stddev=0.001),
             )
             inputs = tf.nn.embedding_lookup(embeddings, captions)
             cell_fw = tf.nn.rnn_cell.MultiRNNCell(
@@ -210,22 +214,20 @@ class Text2ImageMatchingModel:
             time_steps = tf.shape(encoded_input)[1]
             hidden_size = encoded_input.get_shape()[2].value
 
+            # As per: http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
             # Trainable parameters
             w_omega = tf.get_variable(
                 name="w_omega",
-                initializer=tf.random_normal(
-                    [hidden_size, attn_size], stddev=0.1, dtype=tf.float32
-                ),
+                shape=[hidden_size, attn_size],
+                initializer=tf.glorot_uniform_initializer(),
             )
             b_omega = tf.get_variable(
-                name="b_omega",
-                initializer=tf.random_normal([attn_size], stddev=0.1, dtype=tf.float32),
+                name="b_omega", shape=[attn_size], initializer=tf.zeros_initializer()
             )
             u_omega = tf.get_variable(
                 name="u_omega",
-                initializer=tf.random_normal(
-                    [attn_size, attn_heads], stddev=0.1, dtype=tf.float32
-                ),
+                shape=[attn_size, attn_heads],
+                initializer=tf.glorot_uniform_initializer(),
             )
 
             # Apply attention
@@ -233,7 +235,7 @@ class Text2ImageMatchingModel:
             encoded_input_reshaped = tf.reshape(encoded_input, [-1, hidden_size])
             # [B * T, A_size]
             v = tf.tanh(tf.matmul(encoded_input_reshaped, w_omega) + b_omega)
-            # [B * T, A_hops]
+            # [B * T, A_heads]
             vu = tf.matmul(v, u_omega)
             # [B, T, A_heads]
             vu = tf.reshape(vu, [-1, time_steps, attn_heads])
