@@ -1,6 +1,6 @@
 import tensorflow as tf
 import logging
-from typing import Tuple
+from typing import Tuple, List
 from tensorflow.contrib import slim
 
 from utils.constants import embedding_size
@@ -71,7 +71,15 @@ class Text2ImageMatchingModel:
         )
         logger.info("Attention graph created...")
         self.loss = self.compute_loss(margin, attn_heads, batch_hard)
-        self.optimize = self.apply_gradients_op(self.loss, learning_rate, clip_value)
+        no_vgg_vars = self.get_vars(
+            ["image_encoder", "text_encoder", "siamese_attention"]
+        )
+        self.optimize_no_vgg = self.apply_gradients_op(
+            self.loss, learning_rate, clip_value, "no_vgg_optimizer", no_vgg_vars
+        )
+        self.optimize_full = self.apply_gradients_op(
+            self.loss, learning_rate, clip_value, "full_optimizer"
+        )
         # ImageNet graph loader and graph saver/loader
         self.image_encoder_loader = tf.train.Saver(
             tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_19")
@@ -102,25 +110,16 @@ class Text2ImageMatchingModel:
                 [slim.conv2d, slim.max_pool2d],
                 outputs_collections=end_points_collection,
             ):
-                net = slim.repeat(
-                    images, 2, slim.conv2d, 64, [3, 3], scope="conv1", trainable=False
-                )
+                net = slim.repeat(images, 2, slim.conv2d, 64, [3, 3], scope="conv1")
                 net = slim.max_pool2d(net, [2, 2], scope="pool1")
-                net = slim.repeat(
-                    net, 2, slim.conv2d, 128, [3, 3], scope="conv2", trainable=False
-                )
+                net = slim.repeat(net, 2, slim.conv2d, 128, [3, 3], scope="conv2")
                 net = slim.max_pool2d(net, [2, 2], scope="pool2")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 256, [3, 3], scope="conv3", trainable=False
-                )
+                net = slim.repeat(net, 4, slim.conv2d, 256, [3, 3], scope="conv3")
                 net = slim.max_pool2d(net, [2, 2], scope="pool3")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 512, [3, 3], scope="conv4", trainable=False
-                )
+                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv4")
                 net = slim.max_pool2d(net, [2, 2], scope="pool4")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
-                )
+                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv5")
+
         with tf.variable_scope("image_encoder"):
             flatten = tf.reshape(net, (-1, net.shape[3]))
             # As per: https://arxiv.org/abs/1502.01852
@@ -348,7 +347,12 @@ class Text2ImageMatchingModel:
             return loss + l2 + pen_image_alphas + pen_text_alphas
 
     def apply_gradients_op(
-        self, loss: tf.Tensor, learning_rate: float, clip_value: int
+        self,
+        loss: tf.Tensor,
+        learning_rate: float,
+        clip_value: int,
+        scope: str,
+        var_list: List[tf.Variable] = None,
     ) -> tf.Operation:
         """Applies the gradients on the variables.
 
@@ -356,14 +360,16 @@ class Text2ImageMatchingModel:
             loss: The computed loss.
             learning_rate: The optimizer learning rate.
             clip_value: The clipping value.
+            scope: The variable scope of the optimizer.
+            var_list: A list of variables to optimize.
 
         Returns:
             An operation node to be executed in order to apply the computed gradients.
 
         """
-        with tf.variable_scope(name_or_scope="optimizer"):
+        with tf.variable_scope(name_or_scope=scope):
             optimizer = tf.train.AdamOptimizer(learning_rate)
-            gradients, variables = zip(*optimizer.compute_gradients(loss))
+            gradients, variables = zip(*optimizer.compute_gradients(loss, var_list))
             gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
 
             return optimizer.apply_gradients(
@@ -445,3 +451,22 @@ class Text2ImageMatchingModel:
 
         """
         self.saver_loader.save(sess, save_path + self.name)
+
+    @staticmethod
+    def get_vars(scope_names: List[str]) -> List[tf.Variable]:
+        """Gets the variables from multiple scopes and collects them in a list.
+
+        Args:
+            scope_names: A list of scope names.
+
+        Returns:
+            The collected variables.
+
+        """
+        return [
+            variable
+            for scope_name in scope_names
+            for variable in tf.get_collection(
+                tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_name
+            )
+        ]

@@ -22,7 +22,8 @@ def train(
     train_json_path: str,
     val_images_path: str,
     val_json_path: str,
-    epochs: int,
+    warm_up_epochs: int,
+    train_epochs: int,
     recall_at: int,
     batch_size: int,
     prefetch_size: int,
@@ -39,7 +40,8 @@ def train(
         train_json_path: The path to the img2text_matching annotations.
         val_images_path: The path to the validation images.
         val_json_path: The path to the validation annotations.
-        epochs: The number of epochs to train the model.
+        warm_up_epochs: The number of epochs to train the model exluding the vgg.
+        train_epochs: The number of epochs to train the full model.
         recall_at: The recall at K.
         batch_size: The batch size to be used.
         prefetch_size: The size of the prefetch on gpu.
@@ -112,18 +114,24 @@ def train(
         model.init(sess, checkpoint_path, imagenet_checkpoint)
         model.add_summary_graph(sess)
 
-        for e in range(epochs):
+        for e in range(warm_up_epochs + train_epochs):
             # Reset evaluators
             evaluator_train.reset_all_vars()
             evaluator_val.reset_all_vars()
 
-            # Initialize iterator with img2text_matching data
+            # Initialize iterator with train data
             sess.run(loader.train_init)
             try:
                 with tqdm(total=len(train_image_paths)) as pbar:
                     while True:
                         _, loss, lengths = sess.run(
-                            [model.optimize, model.loss, model.captions_len],
+                            [
+                                model.optimize_full
+                                if e > warm_up_epochs
+                                else model.optimize_no_vgg,
+                                model.loss,
+                                model.captions_len,
+                            ],
                             feed_dict={
                                 model.keep_prob: hparams.keep_prob,
                                 model.weight_decay: hparams.weight_decay,
@@ -197,7 +205,8 @@ def main():
         args.train_json_path,
         args.val_images_path,
         args.val_json_path,
-        args.epochs,
+        args.warm_up_epochs,
+        args.train_epochs,
         args.recall_at,
         args.batch_size,
         args.prefetch_size,
@@ -272,10 +281,16 @@ def parse_args():
         help="Where to save the model.",
     )
     parser.add_argument(
-        "--epochs",
+        "--warm_up_epochs",
         type=int,
         default=10,
-        help="The number of epochs to train the model.",
+        help="The number of epochs to train the model excluding the vgg.",
+    )
+    parser.add_argument(
+        "--train_epochs",
+        type=int,
+        default=10,
+        help="The number of epochs to train the full model.",
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."

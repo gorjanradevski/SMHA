@@ -245,12 +245,12 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
 
-                # Initialize iterator with img2text_matching data
+                # Initialize iterator with train data
                 sess.run(loader.train_init)
                 try:
                     while True:
                         _, loss = sess.run(
-                            [model.optimize, model.loss],
+                            [model.optimize_no_vgg, model.loss],
                             feed_dict={
                                 model.keep_prob: keep_prob,
                                 model.weight_decay: weight_decay,
@@ -375,12 +375,12 @@ class PascalHparamsFinder(BaseHparamsFinder):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
 
-                # Initialize iterator with img2text_matching data
+                # Initialize iterator with train data
                 sess.run(loader.train_init)
                 try:
                     while True:
                         _, loss = sess.run(
-                            [model.optimize, model.loss],
+                            [model.optimize_no_vgg, model.loss],
                             feed_dict={
                                 model.keep_prob: keep_prob,
                                 model.weight_decay: weight_decay,
