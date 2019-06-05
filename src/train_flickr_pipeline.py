@@ -188,7 +188,6 @@ def train(
                 [model.val_loss_summary, model.val_recall_at_k_summary],
                 feed_dict={
                     model.val_loss_ph: evaluator_val.loss,
-                    # Log recall at 10
                     model.val_recall_at_k_ph: evaluator_val.cur_image2text_recall_at_k,
                 },
             )
@@ -285,13 +284,13 @@ def parse_args():
     parser.add_argument(
         "--warm_up_epochs",
         type=int,
-        default=10,
+        default=5,
         help="The number of epochs to train the model excluding the vgg.",
     )
     parser.add_argument(
         "--train_epochs",
         type=int,
-        default=10,
+        default=15,
         help="The number of epochs to train the full model.",
     )
     parser.add_argument(

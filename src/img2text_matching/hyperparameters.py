@@ -21,6 +21,7 @@ from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.loaders import TrainValLoader
 from img2text_matching.evaluators import Evaluator
 from utils.git_utils import append_git_hash_on_file_path
+from utils.constants import recall_at_least_flickr, recall_at_least_pascal
 
 logging.getLogger("img2text_matching.datasets").setLevel(logging.ERROR)
 logging.getLogger("img2text_matching.models").setLevel(logging.ERROR)
@@ -277,6 +278,13 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                 if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
                     evaluator_val.update_best_image2text_recall_at_k()
 
+                if e >= self.epochs // 2:
+                    if (
+                        evaluator_val.best_image2text_recall_at_k
+                        < recall_at_least_flickr[self.recall_at]
+                    ):
+                        break
+
         logger.info(
             f"Current best image to text recall at {self.recall_at} is: "
             f"{evaluator_val.best_image2text_recall_at_k}"
@@ -406,6 +414,13 @@ class PascalHparamsFinder(BaseHparamsFinder):
 
                 if evaluator_val.is_best_image2text_recall_at_k(self.recall_at):
                     evaluator_val.update_best_image2text_recall_at_k()
+
+                if e >= self.epochs // 2:
+                    if (
+                        evaluator_val.best_image2text_recall_at_k
+                        < recall_at_least_pascal[self.recall_at]
+                    ):
+                        break
 
         logger.info(
             f"Current best image to text recall at {self.recall_at} is: "
