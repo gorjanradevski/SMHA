@@ -277,6 +277,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                     # last_best is negative value, so taking - last_best
                     if evaluator_val.best_image2text_recall_at_k < -self.last_best / 3:
                         logger.info("Terminating early!")
+                        break
 
         logger.info(
             f"Current best image to text recall at {self.recall_at} is: "
@@ -412,6 +413,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
                     # last_best is negative value, so taking - last_best
                     if evaluator_val.best_image2text_recall_at_k < -self.last_best / 3:
                         logger.info("Terminating early!")
+                        break
 
         logger.info(
             f"Current best image to text recall at {self.recall_at} is: "
