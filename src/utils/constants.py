@@ -20,9 +20,3 @@ inference_for_recall_at = [1, 5, 10]
 
 # Model specifics
 embedding_size = 300
-
-
-# Training specifics
-# Terminate training if recall_at k is not at least
-recall_at_least_pascal = {1: 0.3, 5: 0.45, 10: 0.6}
-recall_at_least_flickr = {1: 0.15, 5: 0.3, 10: 0.45}

@@ -21,7 +21,6 @@ from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.loaders import TrainValLoader
 from img2text_matching.evaluators import Evaluator
 from utils.git_utils import append_git_hash_on_file_path
-from utils.constants import recall_at_least_flickr, recall_at_least_pascal
 
 logging.getLogger("img2text_matching.datasets").setLevel(logging.ERROR)
 logging.getLogger("img2text_matching.models").setLevel(logging.ERROR)
@@ -66,6 +65,7 @@ class BaseHparamsFinder(ABC):
         self.imagenet_checkpoint_path = imagenet_checkpoint_path
         self.epochs = epochs
         self.recall_at = recall_at
+        self.last_best = sys.maxsize
         # Set seed value for all experiments in the current iteration
         self.seed = datetime.now().microsecond
         # Generate experiment name
@@ -121,11 +121,10 @@ class BaseHparamsFinder(ABC):
         for _ in range(num_iters):
             try:
                 trials = pickle.load(open(trials_path, "rb"))
-                last_best = trials.best_trial["result"]["loss"]
+                self.last_best = trials.best_trial["result"]["loss"]
             except FileNotFoundError:
                 trials = Trials()
-                last_best = sys.maxsize
-            logger.info(f"Last best from previous iteration was: {last_best}")
+            logger.info(f"Last best from previous iteration was: {self.last_best}")
             best_hparams = space_eval(
                 self.search_space,
                 fmin(
@@ -142,7 +141,7 @@ class BaseHparamsFinder(ABC):
                 pickle.dump(trials, trials_file)
 
             # Dump hparams only if better result was achieved
-            if trials.best_trial["result"]["loss"] < last_best:
+            if trials.best_trial["result"]["loss"] < self.last_best:
                 best_hparams["name"] = self.name
                 best_hparams["seed"] = self.seed
 
@@ -279,10 +278,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                     evaluator_val.update_best_image2text_recall_at_k()
 
                 if e >= self.epochs // 2:
-                    if (
-                        evaluator_val.best_image2text_recall_at_k
-                        < recall_at_least_flickr[self.recall_at]
-                    ):
+                    if evaluator_val.best_image2text_recall_at_k < self.last_best / 3:
                         break
 
         logger.info(
@@ -416,10 +412,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
                     evaluator_val.update_best_image2text_recall_at_k()
 
                 if e >= self.epochs // 2:
-                    if (
-                        evaluator_val.best_image2text_recall_at_k
-                        < recall_at_least_pascal[self.recall_at]
-                    ):
+                    if evaluator_val.best_image2text_recall_at_k < self.last_best / 3:
                         break
 
         logger.info(
