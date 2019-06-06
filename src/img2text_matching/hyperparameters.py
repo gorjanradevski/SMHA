@@ -274,7 +274,8 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                     evaluator_val.update_best_image2text_recall_at_k()
 
                 if e >= self.epochs // 2:
-                    if evaluator_val.best_image2text_recall_at_k < self.last_best / 3:
+                    # last_best is negative value, so taking - last_best
+                    if evaluator_val.best_image2text_recall_at_k < -self.last_best / 3:
                         logger.info("Terminating early!")
 
         logger.info(
@@ -408,7 +409,8 @@ class PascalHparamsFinder(BaseHparamsFinder):
                     evaluator_val.update_best_image2text_recall_at_k()
 
                 if e >= self.epochs // 2:
-                    if evaluator_val.best_image2text_recall_at_k < self.last_best / 3:
+                    # last_best is negative value, so taking - last_best
+                    if evaluator_val.best_image2text_recall_at_k < -self.last_best / 3:
                         logger.info("Terminating early!")
 
         logger.info(
