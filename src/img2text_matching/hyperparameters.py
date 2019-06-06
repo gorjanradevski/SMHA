@@ -20,7 +20,6 @@ from img2text_matching.datasets import (
 from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.loaders import TrainValLoader
 from img2text_matching.evaluators import Evaluator
-from utils.git_utils import append_git_hash_on_file_path
 
 logging.getLogger("img2text_matching.datasets").setLevel(logging.ERROR)
 logging.getLogger("img2text_matching.models").setLevel(logging.ERROR)
@@ -115,9 +114,6 @@ class BaseHparamsFinder(ABC):
             None
 
         """
-        # Append git commit hash to the paths
-        hparams_path = append_git_hash_on_file_path(hparams_path)
-        trials_path = append_git_hash_on_file_path(trials_path)
         for _ in range(num_iters):
             try:
                 trials = pickle.load(open(trials_path, "rb"))
@@ -279,7 +275,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
 
                 if e >= self.epochs // 2:
                     if evaluator_val.best_image2text_recall_at_k < self.last_best / 3:
-                        break
+                        logger.info("Terminating early!")
 
         logger.info(
             f"Current best image to text recall at {self.recall_at} is: "
@@ -413,7 +409,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
 
                 if e >= self.epochs // 2:
                     if evaluator_val.best_image2text_recall_at_k < self.last_best / 3:
-                        break
+                        logger.info("Terminating early!")
 
         logger.info(
             f"Current best image to text recall at {self.recall_at} is: "
