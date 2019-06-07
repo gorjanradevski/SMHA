@@ -29,8 +29,9 @@ def train(
     imagenet_checkpoint: bool,
     save_model_path: str,
     log_model_path: str,
+    learning_rate: float = None,
 ) -> None:
-    """Starts a img2text_matching session with the Pascal1k sentences dataset.
+    """Starts a training session with the Pascal1k sentences dataset.
 
     Args:
         hparams_path: The path to the hyperparameters yaml file.
@@ -45,12 +46,17 @@ def train(
         imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
+        learning_rate: An optional learning rate. If provided update the one in
+        hparams.
 
     Returns:
         None
 
     """
     hparams = YParams(hparams_path)
+    # If learning rate is provided update the hparams learning rate
+    if learning_rate is not None:
+        hparams.set_hparam("learning_rate", learning_rate)
     dataset = PascalSentencesDataset(images_path, texts_path, hparams.min_unk_sub)
     train_image_paths, train_captions, train_captions_lengths = dataset.get_train_data()
     val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data()
@@ -204,6 +210,7 @@ def main():
         args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
+        args.learning_rate,
     )
 
 
@@ -278,6 +285,12 @@ def parse_args():
     )
     parser.add_argument(
         "--prefetch_size", type=int, default=5, help="The size of prefetch on gpu."
+    )
+    parser.add_argument(
+        "--learning_rate",
+        type=float,
+        default=None,
+        help="This will override the" "hparams learning rate.",
     )
 
     return parser.parse_args()

@@ -88,7 +88,7 @@ class TrainValLoader(BaseLoader):
             output_shapes=(None, None, None),
         )
         self.train_dataset = self.train_dataset.shuffle(
-            buffer_size=len(self.train_image_paths)
+            buffer_size=len(self.train_image_paths), reshuffle_each_iteration=True
         )
         self.train_dataset = self.train_dataset.map(
             self.parse_data, num_parallel_calls=tf.data.experimental.AUTOTUNE
