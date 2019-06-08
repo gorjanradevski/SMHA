@@ -120,7 +120,10 @@ class BaseHparamsFinder(ABC):
                 self.last_best = trials.best_trial["result"]["loss"]
             except FileNotFoundError:
                 trials = Trials()
-            logger.info(f"Last best from previous iteration was: {self.last_best}")
+            logger.info(
+                f"Last best from previous iteration was: {self.last_best} on "
+                f"[{datetime.now().replace(second=0, microsecond=0)}]"
+            )
             best_hparams = space_eval(
                 self.search_space,
                 fmin(
