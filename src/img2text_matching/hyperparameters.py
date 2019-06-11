@@ -20,6 +20,7 @@ from img2text_matching.datasets import (
 from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.loaders import TrainValLoader
 from img2text_matching.evaluators import Evaluator
+from utils.constants import min_unk_sub
 
 logging.getLogger("img2text_matching.datasets").setLevel(logging.ERROR)
 logging.getLogger("img2text_matching.models").setLevel(logging.ERROR)
@@ -71,20 +72,17 @@ class BaseHparamsFinder(ABC):
         self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
         self.search_space = {
-            "min_unk_sub": hp.choice("min_unk_sub", range(3, 10)),
             "layers": hp.choice("layers", [1, 2, 3]),
             "rnn_hidden_size": hp.choice("rnn_hidden_size", [128, 256, 512]),
             "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
-            "weight_decay": hp.loguniform("wd", np.log(0.00001), np.log(0.01)),
             "learning_rate": hp.loguniform(
-                "learning_rate", np.log(0.00001), np.log(0.01)
+                "learning_rate", np.log(0.000_001), np.log(0.1)
             ),
-            "margin": hp.choice("margin", range(1, 100, 5)),
-            "attn_size": hp.choice("attn_size", range(20, 100, 5)),
-            "attn_heads": hp.choice("attn_heads", range(20, 50, 5)),
+            "margin": hp.choice("margin", range(0, 100, 5)),
+            "attn_size": hp.choice("attn_size", [16, 32, 64]),
+            "attn_heads": hp.choice("attn_heads", [1, 5, 10, 20, 40]),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
-            "gradient_clip_val": hp.choice("gradient_clip_val", range(1, 10)),
-            "batch_hard": hp.choice("batch_hard", [True, False]),
+            "gradient_clip_val": hp.choice("gradient_clip_val", [1, 3, 5, 7, 9]),
         }
 
     @abstractmethod
@@ -184,9 +182,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         self.val_imgs_file_path = val_imgs_file_path
 
     def objective(self, args: Dict[str, Any]):
-        min_unk_sub = args["min_unk_sub"]
         rnn_hidden_size = args["rnn_hidden_size"]
-        margin = args["margin"]
         layers = args["layers"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
@@ -194,8 +190,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
-        weight_decay = args["weight_decay"]
-        batch_hard = args["batch_hard"]
+        margin = args["margin"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
@@ -234,7 +229,6 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             attn_heads,
             learning_rate,
             gradient_clip_val,
-            batch_hard,
         )
 
         with tf.Session() as sess:
@@ -249,10 +243,9 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                 try:
                     while True:
                         _, loss = sess.run(
-                            [model.optimize_no_vgg, model.loss],
+                            [model.optimize, model.loss],
                             feed_dict={
                                 model.keep_prob: keep_prob,
-                                model.weight_decay: weight_decay,
                                 model.frob_norm_pen: frob_norm_pen,
                             },
                         )
@@ -321,9 +314,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         self.texts_path = texts_path
 
     def objective(self, args: Dict[str, Any]):
-        min_unk_sub = args["min_unk_sub"]
         rnn_hidden_size = args["rnn_hidden_size"]
-        margin = args["margin"]
         layers = args["layers"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
@@ -331,8 +322,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
-        weight_decay = args["weight_decay"]
-        batch_hard = args["batch_hard"]
+        margin = args["margin"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = (
@@ -370,7 +360,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
             attn_heads,
             learning_rate,
             gradient_clip_val,
-            batch_hard,
         )
 
         with tf.Session() as sess:
@@ -385,10 +374,9 @@ class PascalHparamsFinder(BaseHparamsFinder):
                 try:
                     while True:
                         _, loss = sess.run(
-                            [model.optimize_no_vgg, model.loss],
+                            [model.optimize, model.loss],
                             feed_dict={
                                 model.keep_prob: keep_prob,
-                                model.weight_decay: weight_decay,
                                 model.frob_norm_pen: frob_norm_pen,
                             },
                         )

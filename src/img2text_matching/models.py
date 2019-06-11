@@ -15,7 +15,7 @@ class Text2ImageMatchingModel:
         images: tf.Tensor,
         captions: tf.Tensor,
         captions_len: tf.Tensor,
-        margin: float,
+        margin: int,
         rnn_hidden_size: int,
         vocab_size: int,
         num_layers: int,
@@ -23,7 +23,6 @@ class Text2ImageMatchingModel:
         attn_heads: int,
         learning_rate: float,
         clip_value: int,
-        batch_hard: bool,
         log_dir: str = "",
         name: str = "",
     ):
@@ -46,7 +45,6 @@ class Text2ImageMatchingModel:
         self.global_step = tf.Variable(0, trainable=False, name="global_step")
         # Create dropout and weight decay placeholder
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
-        self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
         self.frob_norm_pen = tf.placeholder_with_default(
             0.0, None, name="frob_norm_pen"
         )
@@ -62,23 +60,18 @@ class Text2ImageMatchingModel:
             self.keep_prob,
         )
         logger.info("Text encoder graph created...")
-        self.attended_images, self.image_alphas = self.join_attention_graph(
-            attn_size, attn_heads, self.image_encoded, "siamese_attention"
+        self.attended_images, self.image_alphas = self.attention_graph(
+            attn_size, attn_heads, self.image_encoded, "image_attention"
         )
         # Reusing the same variables that were used for the images
-        self.attended_captions, self.text_alphas = self.join_attention_graph(
-            attn_size, attn_heads, self.text_encoded, "siamese_attention"
+        self.attended_captions, self.text_alphas = self.attention_graph(
+            attn_size, attn_heads, self.text_encoded, "text_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_heads, batch_hard)
-        no_vgg_vars = self.get_vars(
-            ["image_encoder", "text_encoder", "siamese_attention"]
-        )
-        self.optimize_no_vgg = self.apply_gradients_op(
-            self.loss, learning_rate, clip_value, "no_vgg_optimizer", no_vgg_vars
-        )
-        self.optimize_full = self.apply_gradients_op(
-            self.loss, learning_rate, clip_value, "full_optimizer"
+        self.loss = self.compute_loss(margin, attn_heads)
+
+        self.optimize = self.apply_gradients_op(
+            self.loss, learning_rate, clip_value, "optimizer"
         )
         # ImageNet graph loader and graph saver/loader
         self.image_encoder_loader = tf.train.Saver(
@@ -110,15 +103,25 @@ class Text2ImageMatchingModel:
                 [slim.conv2d, slim.max_pool2d],
                 outputs_collections=end_points_collection,
             ):
-                net = slim.repeat(images, 2, slim.conv2d, 64, [3, 3], scope="conv1")
+                net = slim.repeat(
+                    images, 2, slim.conv2d, 64, [3, 3], scope="conv1", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool1")
-                net = slim.repeat(net, 2, slim.conv2d, 128, [3, 3], scope="conv2")
+                net = slim.repeat(
+                    net, 2, slim.conv2d, 128, [3, 3], scope="conv2", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool2")
-                net = slim.repeat(net, 4, slim.conv2d, 256, [3, 3], scope="conv3")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 256, [3, 3], scope="conv3", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool3")
-                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv4")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 512, [3, 3], scope="conv4", trainable=False
+                )
                 net = slim.max_pool2d(net, [2, 2], scope="pool4")
-                net = slim.repeat(net, 4, slim.conv2d, 512, [3, 3], scope="conv5")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
+                )
 
         with tf.variable_scope("image_encoder"):
             flatten = tf.reshape(net, (-1, net.shape[3]))
@@ -191,7 +194,7 @@ class Text2ImageMatchingModel:
             return tf.add(output_fw, output_bw) / 2
 
     @staticmethod
-    def join_attention_graph(
+    def attention_graph(
         attn_size: int, attn_heads: int, encoded_input: tf.Tensor, scope: str
     ):
         """Applies attention on the encoded image and the encoded text.
@@ -253,7 +256,7 @@ class Text2ImageMatchingModel:
             return output, alphas
 
     @staticmethod
-    def compute_frob_norm(attention_weights: tf.Tensor, attn_heads: int):
+    def compute_frob_norm(attention_weights: tf.Tensor, attn_heads: int) -> tf.Tensor:
         """Computes the Frobenius norm of the attention weights tensor.
 
         Args:
@@ -277,26 +280,20 @@ class Text2ImageMatchingModel:
             )
         )
 
-    def compute_loss(
-        self, margin: float, attn_heads: int, batch_hard: bool
-    ) -> tf.Tensor:
-        """Computes the triplet loss based on:
+    def compute_loss(self, margin: float, attn_heads: int) -> tf.Tensor:
+        """Computes the final loss of the model.
 
-        https://arxiv.org/abs/1707.05612
-
-        1. Computes the triplet loss between the image and text embeddings.
+        1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612
         2. Computes the Frob norm of the of the AA^T - I (image embeddings).
         3. Computes the Frob norm of the of the AA^T - I (text embeddings).
-        4. Computes the L2 norm of the trainable weight matrices.
-        5. Adds all together to compute the loss.
+        4. Adds all together to compute the loss.
 
         Args:
             margin: The contrastive margin.
-            attn_heads: The number of attention hops.
-            batch_hard: Whether to train only on hard negatives.
+            attn_heads: The number of attention heads.
 
         Returns:
-            The triplet loss using the batch-hard strategy.
+            The final loss to be optimized.
 
         """
         with tf.variable_scope(name_or_scope="loss"):
@@ -316,24 +313,12 @@ class Text2ImageMatchingModel:
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-            if batch_hard:
-                # For each positive pair (i,s) pick the hardest contrastive image
-                cost_s = tf.reduce_max(cost_s, axis=1)
-                # For each positive pair (i,s) pick the hardest contrastive sentence
-                cost_im = tf.reduce_max(cost_im, axis=0)
+            # For each positive pair (i,s) pick the hardest contrastive image
+            cost_s = tf.reduce_max(cost_s, axis=1)
+            # For each positive pair (i,s) pick the hardest contrastive sentence
+            cost_im = tf.reduce_max(cost_im, axis=0)
 
             loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
-
-            l2 = (
-                tf.add_n(
-                    [
-                        tf.nn.l2_loss(v)
-                        for v in tf.trainable_variables()
-                        if "bias" not in v.name
-                    ]
-                )
-                * self.weight_decay
-            )
 
             pen_image_alphas = (
                 self.compute_frob_norm(self.image_alphas, attn_heads)
@@ -344,15 +329,10 @@ class Text2ImageMatchingModel:
                 * self.frob_norm_pen
             )
 
-            return loss + l2 + pen_image_alphas + pen_text_alphas
+            return loss + pen_image_alphas + pen_text_alphas
 
     def apply_gradients_op(
-        self,
-        loss: tf.Tensor,
-        learning_rate: float,
-        clip_value: int,
-        scope: str,
-        var_list: List[tf.Variable] = None,
+        self, loss: tf.Tensor, learning_rate: float, clip_value: int, scope: str
     ) -> tf.Operation:
         """Applies the gradients on the variables.
 
@@ -361,7 +341,6 @@ class Text2ImageMatchingModel:
             learning_rate: The optimizer learning rate.
             clip_value: The clipping value.
             scope: The variable scope of the optimizer.
-            var_list: A list of variables to optimize.
 
         Returns:
             An operation node to be executed in order to apply the computed gradients.
@@ -369,7 +348,7 @@ class Text2ImageMatchingModel:
         """
         with tf.variable_scope(name_or_scope=scope):
             optimizer = tf.train.AdamOptimizer(learning_rate)
-            gradients, variables = zip(*optimizer.compute_gradients(loss, var_list))
+            gradients, variables = zip(*optimizer.compute_gradients(loss))
             gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
 
             return optimizer.apply_gradients(

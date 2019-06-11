@@ -9,6 +9,7 @@ from img2text_matching.hyperparameters import YParams
 from img2text_matching.loaders import TrainValLoader
 from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.evaluators import Evaluator
+from utils.constants import min_unk_sub
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,8 +23,7 @@ def train(
     texts_path: str,
     train_imgs_file_path: str,
     val_imgs_file_path: str,
-    warm_up_epochs: int,
-    train_epochs: int,
+    epochs: int,
     recall_at: int,
     batch_size: int,
     prefetch_size: int,
@@ -32,6 +32,8 @@ def train(
     save_model_path: str,
     log_model_path: str,
     learning_rate: float = None,
+    frob_norm_pen: float = None,
+    attn_heads: int = None,
 ) -> None:
     """Starts a training session with the Flickr8k dataset.
 
@@ -41,8 +43,7 @@ def train(
         texts_path: Path where the text doc with the descriptions is.
         train_imgs_file_path: Path to a file with the train image names.
         val_imgs_file_path: Path to a file with the val image names.
-        warm_up_epochs: The number of epochs to train the model exluding the vgg.
-        train_epochs: The number of epochs to train the full model.
+        epochs: The number of epochs to train the model excluding the vgg.
         recall_at: Validate on recall at K.
         batch_size: The batch size to be used.
         prefetch_size: How many batches to keep on GPU ready for processing.
@@ -50,8 +51,9 @@ def train(
         imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
-        learning_rate: An optional learning rate. If provided update the one in
-        hparams.
+        learning_rate: If provided update the one in hparams.
+        frob_norm_pen: If provided update the one in hparams.
+        attn_heads: If provided update the one in hparams.
 
     Returns:
         None
@@ -61,7 +63,13 @@ def train(
     # If learning rate is provided update the hparams learning rate
     if learning_rate is not None:
         hparams.set_hparam("learning_rate", learning_rate)
-    dataset = FlickrDataset(images_path, texts_path, hparams.min_unk_sub)
+    # If frob_norm_pen is provided update the hparams frob_norm_pen
+    if frob_norm_pen is not None:
+        hparams.set_hparam("frob_norm_pen", frob_norm_pen)
+    # If attn_heads is provided update the hparams attn_heads
+    if attn_heads is not None:
+        hparams.set_hparam("attn_heads", attn_heads)
+    dataset = FlickrDataset(images_path, texts_path, min_unk_sub)
     train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
         train_imgs_file_path
     )
@@ -108,7 +116,6 @@ def train(
         hparams.attn_heads,
         hparams.learning_rate,
         hparams.gradient_clip_val,
-        hparams.batch_hard,
         log_model_path,
         hparams.name,
     )
@@ -121,7 +128,7 @@ def train(
         model.init(sess, checkpoint_path, imagenet_checkpoint)
         model.add_summary_graph(sess)
 
-        for e in range(warm_up_epochs + train_epochs):
+        for e in range(epochs):
             # Reset evaluators
             evaluator_train.reset_all_vars()
             evaluator_val.reset_all_vars()
@@ -132,16 +139,9 @@ def train(
                 with tqdm(total=len(train_image_paths)) as pbar:
                     while True:
                         _, loss, lengths = sess.run(
-                            [
-                                model.optimize_full
-                                if e > warm_up_epochs
-                                else model.optimize_no_vgg,
-                                model.loss,
-                                model.captions_len,
-                            ],
+                            [model.optimize, model.loss, model.captions_len],
                             feed_dict={
                                 model.keep_prob: hparams.keep_prob,
-                                model.weight_decay: hparams.weight_decay,
                                 model.frob_norm_pen: hparams.frob_norm_pen,
                             },
                         )
@@ -211,8 +211,7 @@ def main():
         args.texts_path,
         args.train_imgs_file_path,
         args.val_imgs_file_path,
-        args.warm_up_epochs,
-        args.train_epochs,
+        args.epochs,
         args.recall_at,
         args.batch_size,
         args.prefetch_size,
@@ -288,16 +287,10 @@ def parse_args():
         help="Where to save the model.",
     )
     parser.add_argument(
-        "--warm_up_epochs",
+        "--epochs",
         type=int,
         default=5,
         help="The number of epochs to train the model excluding the vgg.",
-    )
-    parser.add_argument(
-        "--train_epochs",
-        type=int,
-        default=15,
-        help="The number of epochs to train the full model.",
     )
     parser.add_argument(
         "--recall_at", type=int, default=10, help="Validate on recall at K."
@@ -313,6 +306,18 @@ def parse_args():
         type=float,
         default=None,
         help="This will override the" "hparams learning rate.",
+    )
+    parser.add_argument(
+        "--frob_norm_pen",
+        type=float,
+        default=None,
+        help="This will override the hparams frob norm penalization rate.",
+    )
+    parser.add_argument(
+        "--attn_heads",
+        type=int,
+        default=None,
+        help="This will override the hparams attendion heads.",
     )
 
     return parser.parse_args()

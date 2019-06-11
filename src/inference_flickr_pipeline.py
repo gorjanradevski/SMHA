@@ -6,10 +6,10 @@ import os
 
 from img2text_matching.datasets import FlickrDataset, get_vocab_size
 from img2text_matching.hyperparameters import YParams
-from img2text_matching.loaders import TestLoader
+from img2text_matching.loaders import InferenceLoader
 from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.evaluators import Evaluator
-from utils.constants import inference_for_recall_at
+from utils.constants import inference_for_recall_at, min_unk_sub
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def inference(
 
     """
     hparams = YParams(hparams_path)
-    dataset = FlickrDataset(images_path, texts_path, hparams.min_unk_sub)
+    dataset = FlickrDataset(images_path, texts_path, min_unk_sub)
     # Getting the vocabulary size of the train dataset
     test_image_paths, test_captions, test_captions_lengths = dataset.get_data(
         test_imgs_file_path
@@ -59,7 +59,7 @@ def inference(
     tf.reset_default_graph()
     tf.set_random_seed(hparams.seed)
 
-    loader = TestLoader(
+    loader = InferenceLoader(
         test_image_paths,
         test_captions,
         test_captions_lengths,
@@ -81,7 +81,6 @@ def inference(
         hparams.attn_heads,
         hparams.learning_rate,
         hparams.gradient_clip_val,
-        hparams.batch_hard,
     )
     logger.info("Model created...")
     logger.info("Inference is starting...")

@@ -9,6 +9,7 @@ from img2text_matching.hyperparameters import YParams
 from img2text_matching.loaders import TrainValLoader
 from img2text_matching.models import Text2ImageMatchingModel
 from img2text_matching.evaluators import Evaluator
+from utils.constants import min_unk_sub
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,8 +23,7 @@ def train(
     train_json_path: str,
     val_images_path: str,
     val_json_path: str,
-    warm_up_epochs: int,
-    train_epochs: int,
+    epochs: int,
     recall_at: int,
     batch_size: int,
     prefetch_size: int,
@@ -32,6 +32,8 @@ def train(
     save_model_path: str,
     log_model_path: str,
     learning_rate: float = None,
+    frob_norm_pen: float = None,
+    attn_heads: int = None,
 ) -> None:
     """Starts a training session.
 
@@ -41,8 +43,7 @@ def train(
         train_json_path: The path to the img2text_matching annotations.
         val_images_path: The path to the validation images.
         val_json_path: The path to the validation annotations.
-        warm_up_epochs: The number of epochs to train the model exluding the vgg.
-        train_epochs: The number of epochs to train the full model.
+        epochs: The number of epochs to train the model excluding the vgg.
         recall_at: The recall at K.
         batch_size: The batch size to be used.
         prefetch_size: The size of the prefetch on gpu.
@@ -50,8 +51,9 @@ def train(
         imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
-        learning_rate: An optional learning rate. If provided update the one in
-        hparams.
+        learning_rate: If provided update the one in hparams.
+        frob_norm_pen: If provided update the one in hparams.
+        attn_heads: If provided update the one in hparams.
 
     Returns:
         None
@@ -61,9 +63,13 @@ def train(
     # If learning rate is provided update the hparams learning rate
     if learning_rate is not None:
         hparams.set_hparam("learning_rate", learning_rate)
-    train_dataset = TrainCocoDataset(
-        train_images_path, train_json_path, hparams.min_unk_sub
-    )
+    # If frob_norm_pen is provided update the hparams frob_norm_pen
+    if frob_norm_pen is not None:
+        hparams.set_hparam("frob_norm_pen", frob_norm_pen)
+    # If attn_heads is provided update the hparams attn_heads
+    if attn_heads is not None:
+        hparams.set_hparam("attn_heads", attn_heads)
+    train_dataset = TrainCocoDataset(train_images_path, train_json_path, min_unk_sub)
     train_image_paths, train_captions, train_captions_lengths = train_dataset.get_data()
     logger.info("Train dataset created...")
     val_dataset = ValCocoDataset(val_images_path, val_json_path)
@@ -107,7 +113,6 @@ def train(
         hparams.attn_heads,
         hparams.learning_rate,
         hparams.gradient_clip_val,
-        hparams.batch_hard,
         log_model_path,
         hparams.name,
     )
@@ -120,7 +125,7 @@ def train(
         model.init(sess, checkpoint_path, imagenet_checkpoint)
         model.add_summary_graph(sess)
 
-        for e in range(warm_up_epochs + train_epochs):
+        for e in range(epochs):
             # Reset evaluators
             evaluator_train.reset_all_vars()
             evaluator_val.reset_all_vars()
@@ -131,16 +136,9 @@ def train(
                 with tqdm(total=len(train_image_paths)) as pbar:
                     while True:
                         _, loss, lengths = sess.run(
-                            [
-                                model.optimize_full
-                                if e > warm_up_epochs
-                                else model.optimize_no_vgg,
-                                model.loss,
-                                model.captions_len,
-                            ],
+                            [model.optimize, model.loss, model.captions_len],
                             feed_dict={
                                 model.keep_prob: hparams.keep_prob,
-                                model.weight_decay: hparams.weight_decay,
                                 model.frob_norm_pen: hparams.frob_norm_pen,
                             },
                         )
@@ -210,8 +208,7 @@ def main():
         args.train_json_path,
         args.val_images_path,
         args.val_json_path,
-        args.warm_up_epochs,
-        args.train_epochs,
+        args.epochs,
         args.recall_at,
         args.batch_size,
         args.prefetch_size,
@@ -286,16 +283,10 @@ def parse_args():
         help="Where to save the model.",
     )
     parser.add_argument(
-        "--warm_up_epochs",
+        "--epochs",
         type=int,
         default=5,
         help="The number of epochs to train the model excluding the vgg.",
-    )
-    parser.add_argument(
-        "--train_epochs",
-        type=int,
-        default=15,
-        help="The number of epochs to train the full model.",
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."
@@ -311,6 +302,18 @@ def parse_args():
         type=float,
         default=None,
         help="This will override the" "hparams learning rate.",
+    )
+    parser.add_argument(
+        "--frob_norm_pen",
+        type=float,
+        default=None,
+        help="This will override the hparams frob norm penalization rate.",
+    )
+    parser.add_argument(
+        "--attn_heads",
+        type=int,
+        default=None,
+        help="This will override the hparams attendion heads.",
     )
 
     return parser.parse_args()

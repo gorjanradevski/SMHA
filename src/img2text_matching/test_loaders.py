@@ -2,7 +2,7 @@ import pytest
 import tensorflow as tf
 import numpy as np
 
-from img2text_matching.loaders import TrainValLoader, TestLoader
+from img2text_matching.loaders import TrainValLoader, InferenceLoader
 
 
 @pytest.fixture
@@ -214,12 +214,12 @@ def test_train_val_loader_all_elements_val_taken(
                 pass
 
 
-def test_test_loader(
+def test_inference_loader(
     val_image_paths, val_captions, val_captions_lengths, batch_size, prefetch_size
 ):
     # Using the validation fixtures since it wouldn't make any difference
     tf.reset_default_graph()
-    loader = TestLoader(
+    loader = InferenceLoader(
         val_image_paths, val_captions, val_captions_lengths, batch_size, prefetch_size
     )
     images, captions, captions_lengths = loader.get_next()

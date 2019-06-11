@@ -156,7 +156,7 @@ class TrainValLoader(BaseLoader):
         return images, captions, captions_lengths
 
 
-class TestLoader(BaseLoader):
+class InferenceLoader(BaseLoader):
     def __init__(
         self,
         test_image_paths: List[str],

@@ -40,7 +40,7 @@ def captions_len():
 
 @pytest.fixture
 def margin():
-    return 0.0
+    return 2
 
 
 @pytest.fixture
@@ -87,11 +87,6 @@ def attn_heads():
 @pytest.fixture
 def frob_norm_pen():
     return 1
-
-
-@pytest.fixture
-def batch_hard():
-    return False
 
 
 def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
@@ -148,7 +143,7 @@ def test_joint_attention(attn_size, attn_heads, encoded_input):
     tf.reset_default_graph()
     encoded_input_shape = encoded_input.shape
     input_layer = tf.placeholder(dtype=tf.float32, shape=encoded_input_shape)
-    attention = Text2ImageMatchingModel.join_attention_graph(
+    attention = Text2ImageMatchingModel.attention_graph(
         attn_size, attn_heads, input_layer, "siamese_attention"
     )
     with tf.Session() as sess:
@@ -175,7 +170,6 @@ def test_attended_image_text_shape(
     attn_heads,
     learning_rate,
     clip_value,
-    batch_hard,
 ):
     tf.reset_default_graph()
     model = Text2ImageMatchingModel(
@@ -190,7 +184,6 @@ def test_attended_image_text_shape(
         attn_heads,
         learning_rate,
         clip_value,
-        batch_hard,
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]
