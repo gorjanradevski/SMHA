@@ -1,7 +1,7 @@
 import argparse
 import os
 import tensorflow as tf
-from img2text_matching.hyperparameters import FlickrHparamsFinder
+from multi_hop_attention.hyperparameters import FlickrHparamsFinder
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 tf.logging.set_verbosity(tf.logging.ERROR)

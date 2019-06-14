@@ -23,6 +23,7 @@ class Text2ImageMatchingModel:
         attn_heads: int,
         learning_rate: float,
         clip_value: int,
+        batch_hard: bool,
         log_dir: str = "",
         name: str = "",
     ):
@@ -61,14 +62,14 @@ class Text2ImageMatchingModel:
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.attention_graph(
-            attn_size, attn_heads, self.image_encoded, "image_attention"
+            attn_size, attn_heads, self.image_encoded, "siamese_attention"
         )
         # Reusing the same variables that were used for the images
         self.attended_captions, self.text_alphas = self.attention_graph(
-            attn_size, attn_heads, self.text_encoded, "text_attention"
+            attn_size, attn_heads, self.text_encoded, "siamese_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_heads)
+        self.loss = self.compute_loss(margin, attn_heads, batch_hard)
 
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, "optimizer"
@@ -129,8 +130,7 @@ class Text2ImageMatchingModel:
             project_layer = tf.layers.dense(
                 flatten,
                 rnn_hidden_size,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                activation=tf.nn.relu,
+                kernel_initializer=tf.glorot_uniform_initializer(),
             )
 
             return tf.reshape(
@@ -191,7 +191,7 @@ class Text2ImageMatchingModel:
                 cell_fw, cell_bw, inputs, sequence_length=captions_len, dtype=tf.float32
             )
 
-            return tf.add(output_fw, output_bw) / 2
+            return tf.add(output_fw, output_bw)
 
     @staticmethod
     def attention_graph(
@@ -252,6 +252,8 @@ class Text2ImageMatchingModel:
             output = tf.matmul(alphas, encoded_input)
             # [B, A_heads * H]
             output = tf.layers.flatten(output)
+            # [B, A_heads * H] normalized output
+            output = tf.math.l2_normalize(output, axis=1)
 
             return output, alphas
 
@@ -280,7 +282,9 @@ class Text2ImageMatchingModel:
             )
         )
 
-    def compute_loss(self, margin: float, attn_heads: int) -> tf.Tensor:
+    def compute_loss(
+        self, margin: float, attn_heads: int, batch_hard: bool
+    ) -> tf.Tensor:
         """Computes the final loss of the model.
 
         1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612
@@ -291,6 +295,7 @@ class Text2ImageMatchingModel:
         Args:
             margin: The contrastive margin.
             attn_heads: The number of attention heads.
+            batch_hard: Whether to train only on the hard negatives.
 
         Returns:
             The final loss to be optimized.
@@ -313,10 +318,11 @@ class Text2ImageMatchingModel:
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-            # For each positive pair (i,s) pick the hardest contrastive image
-            cost_s = tf.reduce_max(cost_s, axis=1)
-            # For each positive pair (i,s) pick the hardest contrastive sentence
-            cost_im = tf.reduce_max(cost_im, axis=0)
+            if batch_hard:
+                # For each positive pair (i,s) pick the hardest contrastive image
+                cost_s = tf.reduce_max(cost_s, axis=1)
+                # For each positive pair (i,s) pick the hardest contrastive sentence
+                cost_im = tf.reduce_max(cost_im, axis=0)
 
             loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 

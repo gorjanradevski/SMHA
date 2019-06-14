@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 
-from img2text_matching.models import Text2ImageMatchingModel
+from multi_hop_attention.models import Text2ImageMatchingModel
 
 
 @pytest.fixture
@@ -89,6 +89,11 @@ def frob_norm_pen():
     return 1
 
 
+@pytest.fixture
+def batch_hard():
+    return True
+
+
 def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
@@ -170,6 +175,7 @@ def test_attended_image_text_shape(
     attn_heads,
     learning_rate,
     clip_value,
+    batch_hard,
 ):
     tf.reset_default_graph()
     model = Text2ImageMatchingModel(
@@ -184,6 +190,7 @@ def test_attended_image_text_shape(
         attn_heads,
         learning_rate,
         clip_value,
+        batch_hard,
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]

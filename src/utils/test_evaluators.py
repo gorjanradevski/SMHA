@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from img2text_matching.evaluators import Evaluator
+from utils.evaluators import Evaluator
 
 
 @pytest.fixture

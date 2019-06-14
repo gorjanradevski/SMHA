@@ -3,18 +3,23 @@ import argparse
 import logging
 from tqdm import tqdm
 import os
+import absl.logging
 
-from img2text_matching.datasets import FlickrDataset, get_vocab_size
-from img2text_matching.hyperparameters import YParams
-from img2text_matching.loaders import InferenceLoader
-from img2text_matching.models import Text2ImageMatchingModel
-from img2text_matching.evaluators import Evaluator
+from utils.datasets import FlickrDataset, get_vocab_size
+from multi_hop_attention.hyperparameters import YParams
+from multi_hop_attention.loaders import InferenceLoader
+from multi_hop_attention.models import Text2ImageMatchingModel
+from utils.evaluators import Evaluator
 from utils.constants import inference_for_recall_at, min_unk_sub
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 tf.logging.set_verbosity(tf.logging.ERROR)
+
+# https://github.com/abseil/abseil-py/issues/99
+absl.logging.set_verbosity("info")
+absl.logging.set_stderrthreshold("info")
 
 
 def inference(
@@ -81,6 +86,7 @@ def inference(
         hparams.attn_heads,
         hparams.learning_rate,
         hparams.gradient_clip_val,
+        hparams.batch_hard,
     )
     logger.info("Model created...")
     logger.info("Inference is starting...")

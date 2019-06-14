@@ -12,20 +12,16 @@ import logging
 import pickle
 import sys
 
-from img2text_matching.datasets import (
-    FlickrDataset,
-    PascalSentencesDataset,
-    get_vocab_size,
-)
-from img2text_matching.models import Text2ImageMatchingModel
-from img2text_matching.loaders import TrainValLoader
-from img2text_matching.evaluators import Evaluator
+from utils.datasets import FlickrDataset, PascalSentencesDataset, get_vocab_size
+from multi_hop_attention.models import Text2ImageMatchingModel
+from multi_hop_attention.loaders import TrainValLoader
+from utils.evaluators import Evaluator
 from utils.constants import min_unk_sub
 
-logging.getLogger("img2text_matching.datasets").setLevel(logging.ERROR)
-logging.getLogger("img2text_matching.models").setLevel(logging.ERROR)
-logging.getLogger("img2text_matching.loaders").setLevel(logging.ERROR)
-logging.getLogger("img2text_matching.evaluators").setLevel(logging.ERROR)
+logging.getLogger("utils.datasets").setLevel(logging.ERROR)
+logging.getLogger("multi_hop_attention.models").setLevel(logging.ERROR)
+logging.getLogger("multi_hop_attention.loaders").setLevel(logging.ERROR)
+logging.getLogger("utils.evaluators").setLevel(logging.ERROR)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 class YParams(HParams):
     def __init__(self, hparams_path: str):
-
         super().__init__()
         with open(hparams_path) as fp:
             for k, v in YAML().load(fp).items():
@@ -76,13 +71,14 @@ class BaseHparamsFinder(ABC):
             "rnn_hidden_size": hp.choice("rnn_hidden_size", [128, 256, 512]),
             "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
             "learning_rate": hp.loguniform(
-                "learning_rate", np.log(0.000_001), np.log(0.1)
+                "learning_rate", np.log(0.00001), np.log(0.1)
             ),
-            "margin": hp.choice("margin", range(0, 100, 5)),
+            "margin": hp.choice("margin", [0.02, 0.2, 0.4, 1.0, 3.0, 5.0]),
             "attn_size": hp.choice("attn_size", [16, 32, 64]),
             "attn_heads": hp.choice("attn_heads", [1, 5, 10, 20, 40]),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
             "gradient_clip_val": hp.choice("gradient_clip_val", [1, 3, 5, 7, 9]),
+            "batch_hard": hp.choice("batch_hard", [True, False]),
         }
 
     @abstractmethod
@@ -191,6 +187,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
         margin = args["margin"]
+        batch_hard = args["batch_hard"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
@@ -227,6 +224,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             layers,
             attn_size,
             attn_heads,
+            batch_hard,
             learning_rate,
             gradient_clip_val,
         )
@@ -323,6 +321,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         gradient_clip_val = args["gradient_clip_val"]
         keep_prob = args["keep_prob"]
         margin = args["margin"]
+        batch_hard = args["batch_hard"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = (
@@ -358,6 +357,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
             layers,
             attn_size,
             attn_heads,
+            batch_hard,
             learning_rate,
             gradient_clip_val,
         )

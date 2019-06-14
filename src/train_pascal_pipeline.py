@@ -3,18 +3,23 @@ import argparse
 import logging
 from tqdm import tqdm
 import os
+import absl.logging
 
-from img2text_matching.datasets import PascalSentencesDataset, get_vocab_size
-from img2text_matching.hyperparameters import YParams
-from img2text_matching.loaders import TrainValLoader
-from img2text_matching.models import Text2ImageMatchingModel
-from img2text_matching.evaluators import Evaluator
+from utils.datasets import PascalSentencesDataset, get_vocab_size
+from multi_hop_attention.hyperparameters import YParams
+from multi_hop_attention.loaders import TrainValLoader
+from multi_hop_attention.models import Text2ImageMatchingModel
+from utils.evaluators import Evaluator
 from utils.constants import min_unk_sub
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 tf.logging.set_verbosity(tf.logging.ERROR)
+
+# https://github.com/abseil/abseil-py/issues/99
+absl.logging.set_verbosity("info")
+absl.logging.set_stderrthreshold("info")
 
 
 def train(
@@ -108,6 +113,7 @@ def train(
         hparams.attn_heads,
         hparams.learning_rate,
         hparams.gradient_clip_val,
+        hparams.batch_hard,
         log_model_path,
         hparams.name,
     )
@@ -174,7 +180,7 @@ def train(
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
 
-            # Write img2text_matching summaries
+            # Write multi_hop_attention summaries
             train_loss_summary = sess.run(
                 model.train_loss_summary,
                 feed_dict={model.train_loss_ph: evaluator_train.loss},
@@ -210,6 +216,8 @@ def main():
         args.save_model_path,
         args.log_model_path,
         args.learning_rate,
+        args.frob_norm_pen,
+        args.attn_heads,
     )
 
 
@@ -221,7 +229,7 @@ def parse_args():
 
     """
     parser = argparse.ArgumentParser(
-        description="Performs img2text_matching on the Pascal sentences dataset."
+        description="Performs multi_hop_attention on the Pascal sentences dataset."
     )
     parser.add_argument(
         "--hparams_path",

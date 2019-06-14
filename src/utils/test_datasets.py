@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from img2text_matching.datasets import (
+from utils.datasets import (
     BaseCocoDataset,
     TrainCocoDataset,
     preprocess_caption,
