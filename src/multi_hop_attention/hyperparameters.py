@@ -77,6 +77,7 @@ class BaseHparamsFinder(ABC):
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
             "gradient_clip_val": hp.choice("gradient_clip_val", [1, 3, 5, 7, 9]),
             "batch_hard": hp.choice("batch_hard", [True, False]),
+            "use_gor": hp.choice("use_gor", [True, False]),
         }
 
     @abstractmethod
@@ -182,6 +183,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         keep_prob = args["keep_prob"]
         margin = args["margin"]
         batch_hard = args["batch_hard"]
+        use_gor = args["use_gor"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
@@ -194,7 +196,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * attn_heads)
 
         # Resetting the default graph and setting the random seed
-        tf.reset_default_graph()
+        tf.keras.backend.clear_session()
         tf.set_random_seed(self.seed)
 
         loader = TrainValLoader(
@@ -224,6 +226,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             gradient_clip_val,
             decay_steps,
             batch_hard,
+            use_gor,
         )
 
         with tf.Session() as sess:
@@ -315,6 +318,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         keep_prob = args["keep_prob"]
         margin = args["margin"]
         batch_hard = args["batch_hard"]
+        use_gor = args["use_gor"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
         train_image_paths, train_captions, train_captions_lengths = (
@@ -326,7 +330,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * attn_heads)
 
         # Resetting the default graph and setting the random seed
-        tf.reset_default_graph()
+        tf.keras.backend.clear_session()
         tf.set_random_seed(self.seed)
 
         loader = TrainValLoader(
@@ -356,6 +360,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
             gradient_clip_val,
             decay_steps,
             batch_hard,
+            use_gor,
         )
         with tf.Session() as sess:
             # Initialize model

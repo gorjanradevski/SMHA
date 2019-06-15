@@ -10,3 +10,4 @@ frob_norm_pen: 3.0
 gradient_clip_val: 5
 seed: 42
 batch_hard: False
+use_gor: False

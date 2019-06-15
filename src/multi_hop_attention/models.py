@@ -24,6 +24,7 @@ class MultiHopAttentionModel:
         clip_value: int = 0,
         decay_steps: float = 0.0,
         batch_hard: bool = False,
+        use_gor: bool = False,
         log_dir: str = "",
         name: str = "",
     ):
@@ -69,7 +70,9 @@ class MultiHopAttentionModel:
             attn_size, attn_heads, self.text_encoded, "siamese_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_heads, batch_hard)
+        self.loss = self.compute_loss(
+            margin, batch_hard, use_gor, attn_heads, rnn_hidden_size
+        )
 
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
@@ -82,7 +85,6 @@ class MultiHopAttentionModel:
         """Extract higher level features from the image using a conv vgg19 pretrained on
         Image net.
 
-
         Args:
             images: The input images.
             rnn_hidden_size: The hidden size of its text counterpart.
@@ -93,11 +95,11 @@ class MultiHopAttentionModel:
         """
         with tf.variable_scope("image_encoder"):
             vgg19 = tf.keras.applications.VGG19(
-                include_top=False, weights="imagenet", input_tensor=images, pooling=None
+                include_top=False, weights="imagenet", pooling=None
             )
-            for layer in vgg19.layers:
-                layer.trainable = False
-            flatten = tf.reshape(vgg19.output, (-1, vgg19.output.shape[3]))
+            vgg19.trainable = False
+            output = vgg19(images)
+            flatten = tf.reshape(output, (-1, output.shape[3]))
             # As per: https://arxiv.org/abs/1502.01852
             project_layer = tf.layers.dense(
                 flatten,
@@ -106,8 +108,7 @@ class MultiHopAttentionModel:
             )
 
             return tf.reshape(
-                project_layer,
-                (-1, vgg19.output.shape[1] * vgg19.output.shape[2], rnn_hidden_size),
+                project_layer, (-1, output.shape[1] * output.shape[2], rnn_hidden_size)
             )
 
     @staticmethod
@@ -255,8 +256,56 @@ class MultiHopAttentionModel:
             )
         )
 
+    @staticmethod
+    def triplet_loss(scores: tf.Tensor, margin, batch_hard):
+        diagonal = tf.diag_part(scores)
+        # Compare every diagonal score to scores in its column
+        # All contrastive images for each sentence
+        cost_s = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
+        # Compare every diagonal score to scores in its row
+        # All contrastive sentences for each image
+        cost_im = tf.maximum(0.0, margin - diagonal + scores)
+
+        # Clear diagonals
+        cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
+        cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
+
+        if batch_hard:
+            # For each positive pair (i,s) pick the hardest contrastive image
+            cost_s = tf.reduce_max(cost_s, axis=1)
+            # For each positive pair (i,s) pick the hardest contrastive sentence
+            cost_im = tf.reduce_max(cost_im, axis=0)
+
+        return tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
+
+    @staticmethod
+    def gor(scores: tf.Tensor, joint_space: int):
+        """Computes the global orthogonal regularization term as per:
+
+        https://arxiv.org/abs/1708.06320
+
+        Args:
+            scores: The per batch similarity scores.
+            joint_space: The size of the joint space.
+
+        Returns:
+            The global orthogonal regularization term.
+
+        """
+        scores_diag = tf.linalg.set_diag(scores, tf.zeros(tf.shape(scores)[0]))
+        non_zero = tf.cast(tf.count_nonzero(scores_diag), tf.float32)
+        m1 = tf.reduce_sum(scores_diag) / non_zero
+        m2 = tf.reduce_sum(tf.pow(scores_diag, 2)) / non_zero
+        d = 1 / joint_space
+        return tf.pow(m1, 2) + tf.maximum(0, m2 - d)
+
     def compute_loss(
-        self, margin: float, attn_heads: int, batch_hard: bool
+        self,
+        margin: float,
+        batch_hard: bool,
+        use_gor: bool,
+        attn_heads: int,
+        rnn_hidden_size: int,
     ) -> tf.Tensor:
         """Computes the final loss of the model.
 
@@ -269,6 +318,8 @@ class MultiHopAttentionModel:
             margin: The contrastive margin.
             attn_heads: The number of attention heads.
             batch_hard: Whether to train only on the hard negatives.
+            use_gor: Whether to compute the global orthogonal regularization.
+            rnn_hidden_size: The size of the cell of the rnn.
 
         Returns:
             The final loss to be optimized.
@@ -278,26 +329,10 @@ class MultiHopAttentionModel:
             scores = tf.matmul(
                 self.attended_images, self.attended_captions, transpose_b=True
             )
-            diagonal = tf.diag_part(scores)
-
-            # Compare every diagonal score to scores in its column
-            # All contrastive images for each sentence
-            cost_s = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
-            # Compare every diagonal score to scores in its row
-            # All contrastive sentences for each image
-            cost_im = tf.maximum(0.0, margin - diagonal + scores)
-
-            # Clear diagonals
-            cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
-            cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
-
-            if batch_hard:
-                # For each positive pair (i,s) pick the hardest contrastive image
-                cost_s = tf.reduce_max(cost_s, axis=1)
-                # For each positive pair (i,s) pick the hardest contrastive sentence
-                cost_im = tf.reduce_max(cost_im, axis=0)
-
-            loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
+            triplet_loss = self.triplet_loss(scores, margin, batch_hard)
+            gor = 0.0
+            if use_gor:
+                gor = self.gor(scores, attn_heads * rnn_hidden_size)
 
             pen_image_alphas = (
                 self.compute_frob_norm(self.image_alphas, attn_heads)
@@ -308,7 +343,7 @@ class MultiHopAttentionModel:
                 * self.frob_norm_pen
             )
 
-            return loss + pen_image_alphas + pen_text_alphas
+            return triplet_loss + gor + pen_image_alphas + pen_text_alphas
 
     def apply_gradients_op(
         self, loss: tf.Tensor, learning_rate: float, clip_value: int, decay_steps: float

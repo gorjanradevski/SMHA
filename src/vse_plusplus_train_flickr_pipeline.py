@@ -68,7 +68,7 @@ def train(
     logger.info("Evaluators created...")
 
     # Resetting the default graph
-    tf.reset_default_graph()
+    tf.keras.backend.clear_session()
 
     loader = TrainValLoader(
         train_image_paths,

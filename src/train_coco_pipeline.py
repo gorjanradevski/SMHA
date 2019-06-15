@@ -88,7 +88,7 @@ def train(
     logger.info("Evaluators created...")
 
     # Resetting the default graph and setting the random seed
-    tf.reset_default_graph()
+    tf.keras.backend.clear_session()
     tf.set_random_seed(hparams.seed)
 
     loader = TrainValLoader(
@@ -119,6 +119,7 @@ def train(
         hparams.gradient_clip_val,
         decay_steps,
         hparams.batch_hard,
+        hparams.use_gor,
         log_model_path,
         hparams.name,
     )

@@ -100,7 +100,7 @@ def decay_epochs():
 
 
 def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
-    tf.reset_default_graph()
+    tf.keras.backend.clear_session()
     image_inputs_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
     image_encoded = MultiHopAttentionModel.image_encoder_graph(
         image_inputs_layer, rnn_hidden_size
@@ -117,27 +117,28 @@ def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
 def test_image_encoder_batch_size_invariance(
     input_images_image_encoder, rnn_hidden_size
 ):
-    tf.reset_default_graph()
-    input_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
+    tf.keras.backend.clear_session()
+    image_inputs_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
     image_encoded = MultiHopAttentionModel.image_encoder_graph(
-        input_layer, rnn_hidden_size
+        image_inputs_layer, rnn_hidden_size
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         output_5 = sess.run(
-            image_encoded, feed_dict={input_layer: input_images_image_encoder[:5]}
+            image_encoded,
+            feed_dict={image_inputs_layer: input_images_image_encoder[:5]},
         )
         output_50 = sess.run(
-            image_encoded, feed_dict={input_layer: input_images_image_encoder}
+            image_encoded, feed_dict={image_inputs_layer: input_images_image_encoder}
         )
 
-        np.testing.assert_equal(output_50[:5], output_5)
+        np.testing.assert_almost_equal(output_50[:5], output_5)
 
 
 def test_text_encoder(
     captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
 ):
-    tf.reset_default_graph()
+    tf.keras.backend.clear_session()
     text_encoded = MultiHopAttentionModel.text_encoder_graph(
         captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
     )
@@ -150,7 +151,7 @@ def test_text_encoder(
 
 
 def test_joint_attention(attn_size, attn_heads, encoded_input):
-    tf.reset_default_graph()
+    tf.keras.backend.clear_session()
     encoded_input_shape = encoded_input.shape
     input_layer = tf.placeholder(dtype=tf.float32, shape=encoded_input_shape)
     attention = MultiHopAttentionModel.attention_graph(
@@ -182,7 +183,7 @@ def test_attended_image_text_shape(
     clip_value,
     batch_hard,
 ):
-    tf.reset_default_graph()
+    tf.keras.backend.clear_session()
     model = MultiHopAttentionModel(
         input_images,
         captions,
@@ -193,10 +194,6 @@ def test_attended_image_text_shape(
         num_layers,
         attn_size,
         attn_heads,
-        learning_rate,
-        clip_value,
-        decay_epochs,
-        batch_hard,
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]
