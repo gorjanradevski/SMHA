@@ -250,6 +250,7 @@ class MultiHopAttentionModel:
             tf.tile(tf.eye(attn_heads), [tf.shape(attention_weights)[0], 1]),
             [-1, attn_heads, attn_heads],
         )
+
         return tf.reduce_mean(
             tf.square(
                 tf.norm(attn_w_dot_product - identity_matrix, axis=[-2, -1], ord="fro")
@@ -297,6 +298,7 @@ class MultiHopAttentionModel:
         m1 = tf.reduce_sum(scores_diag) / non_zero
         m2 = tf.reduce_sum(tf.pow(scores_diag, 2)) / non_zero
         d = 1 / joint_space
+
         return tf.pow(m1, 2) + tf.maximum(0, m2 - d)
 
     def compute_loss(
