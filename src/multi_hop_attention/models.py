@@ -300,7 +300,7 @@ class MultiHopAttentionModel:
         m2 = tf.reduce_sum(tf.pow(scores_diag, 2)) / non_zero
         d = 1 / joint_space
 
-        return tf.pow(m1, 2) + tf.maximum(0, m2 - d)
+        return tf.pow(m1, 2) + tf.maximum(0.0, m2 - d)
 
     def compute_loss(
         self,
