@@ -8,9 +8,9 @@ import absl.logging
 from utils.datasets import PascalSentencesDataset, get_vocab_size
 from multi_hop_attention.hyperparameters import YParams
 from multi_hop_attention.loaders import TrainValLoader
-from multi_hop_attention.models import Text2ImageMatchingModel
+from multi_hop_attention.models import MultiHopAttentionModel
 from utils.evaluators import Evaluator
-from utils.constants import min_unk_sub
+from utils.constants import min_unk_sub, decay_rate_epochs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ def train(
     batch_size: int,
     prefetch_size: int,
     checkpoint_path: str,
-    imagenet_checkpoint: bool,
     save_model_path: str,
     log_model_path: str,
     learning_rate: float = None,
@@ -49,7 +48,6 @@ def train(
         batch_size: The batch size to be used.
         prefetch_size: How many batches to keep on GPU ready for processing.
         checkpoint_path: Path to a valid model checkpoint.
-        imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         learning_rate: If provided update the one in hparams.
@@ -101,7 +99,8 @@ def train(
     images, captions, captions_lengths = loader.get_next()
     logger.info("Loader created...")
 
-    model = Text2ImageMatchingModel(
+    decay_steps = decay_rate_epochs * len(train_image_paths) / batch_size
+    model = MultiHopAttentionModel(
         images,
         captions,
         captions_lengths,
@@ -113,6 +112,7 @@ def train(
         hparams.attn_heads,
         hparams.learning_rate,
         hparams.gradient_clip_val,
+        decay_steps,
         hparams.batch_hard,
         log_model_path,
         hparams.name,
@@ -123,7 +123,7 @@ def train(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path, imagenet_checkpoint)
+        model.init(sess, checkpoint_path)
         model.add_summary_graph(sess)
 
         for e in range(epochs):
@@ -212,7 +212,6 @@ def main():
         args.batch_size,
         args.prefetch_size,
         args.checkpoint_path,
-        args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
         args.learning_rate,
@@ -250,15 +249,7 @@ def parse_args():
         help="Path to the file where the image to caption mappings are.",
     )
     parser.add_argument(
-        "--checkpoint_path",
-        type=str,
-        default="models/image_encoders/vgg_19.ckpt",
-        help="Path to a model checkpoint.",
-    )
-    parser.add_argument(
-        "--imagenet_checkpoint",
-        action="store_true",
-        help="If the checkpoint is an imagenet checkpoint.",
+        "--checkpoint_path", type=str, default=None, help="Path to a model checkpoint."
     )
     parser.add_argument(
         "--log_model_path",

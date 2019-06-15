@@ -1,7 +1,6 @@
 import tensorflow as tf
 import logging
-from typing import Tuple, List
-from tensorflow.contrib import slim
+from typing import Tuple
 
 from utils.constants import embedding_size
 
@@ -9,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class Text2ImageMatchingModel:
+class MultiHopAttentionModel:
     def __init__(
         self,
         images: tf.Tensor,
@@ -21,9 +20,10 @@ class Text2ImageMatchingModel:
         num_layers: int,
         attn_size: int,
         attn_heads: int,
-        learning_rate: float,
-        clip_value: int,
-        batch_hard: bool,
+        learning_rate: float = 0.0,
+        clip_value: int = 0,
+        decay_steps: float = 0.0,
+        batch_hard: bool = False,
         log_dir: str = "",
         name: str = "",
     ):
@@ -72,21 +72,16 @@ class Text2ImageMatchingModel:
         self.loss = self.compute_loss(margin, attn_heads, batch_hard)
 
         self.optimize = self.apply_gradients_op(
-            self.loss, learning_rate, clip_value, "optimizer"
-        )
-        # ImageNet graph loader and graph saver/loader
-        self.image_encoder_loader = tf.train.Saver(
-            tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_19")
+            self.loss, learning_rate, clip_value, decay_steps
         )
         self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")
 
     @staticmethod
     def image_encoder_graph(images: tf.Tensor, rnn_hidden_size: int) -> tf.Tensor:
-        """Extract higher level features from the image using a conv net pretrained on
+        """Extract higher level features from the image using a conv vgg19 pretrained on
         Image net.
 
-        https://github.com/tensorflow/models/blob/master/research/slim/nets/vgg.py
 
         Args:
             images: The input images.
@@ -96,36 +91,13 @@ class Text2ImageMatchingModel:
             The encoded image.
 
         """
-        # As per: https://arxiv.org/abs/1409.1556
-        with tf.variable_scope("vgg_19", "vgg_19", [images]) as sc:
-            end_points_collection = sc.original_name_scope + "_end_points"
-            # Collect outputs for conv2d and max_pool2d.
-            with slim.arg_scope(
-                [slim.conv2d, slim.max_pool2d],
-                outputs_collections=end_points_collection,
-            ):
-                net = slim.repeat(
-                    images, 2, slim.conv2d, 64, [3, 3], scope="conv1", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool1")
-                net = slim.repeat(
-                    net, 2, slim.conv2d, 128, [3, 3], scope="conv2", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool2")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 256, [3, 3], scope="conv3", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool3")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 512, [3, 3], scope="conv4", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool4")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
-                )
-
         with tf.variable_scope("image_encoder"):
-            flatten = tf.reshape(net, (-1, net.shape[3]))
+            vgg19 = tf.keras.applications.VGG19(
+                include_top=False, weights="imagenet", input_tensor=images, pooling=None
+            )
+            for layer in vgg19.layers:
+                layer.trainable = False
+            flatten = tf.reshape(vgg19.output, (-1, vgg19.output.shape[3]))
             # As per: https://arxiv.org/abs/1502.01852
             project_layer = tf.layers.dense(
                 flatten,
@@ -134,7 +106,8 @@ class Text2ImageMatchingModel:
             )
 
             return tf.reshape(
-                project_layer, (-1, net.shape[1] * net.shape[2], rnn_hidden_size)
+                project_layer,
+                (-1, vgg19.output.shape[1] * vgg19.output.shape[2], rnn_hidden_size),
             )
 
     @staticmethod
@@ -338,7 +311,7 @@ class Text2ImageMatchingModel:
             return loss + pen_image_alphas + pen_text_alphas
 
     def apply_gradients_op(
-        self, loss: tf.Tensor, learning_rate: float, clip_value: int, scope: str
+        self, loss: tf.Tensor, learning_rate: float, clip_value: int, decay_steps: float
     ) -> tf.Operation:
         """Applies the gradients on the variables.
 
@@ -346,13 +319,21 @@ class Text2ImageMatchingModel:
             loss: The computed loss.
             learning_rate: The optimizer learning rate.
             clip_value: The clipping value.
-            scope: The variable scope of the optimizer.
+            decay_steps: Decay the learning rate every decay_steps.
 
         Returns:
             An operation node to be executed in order to apply the computed gradients.
 
         """
-        with tf.variable_scope(name_or_scope=scope):
+        with tf.variable_scope(name_or_scope="optimizer"):
+            learning_rate = tf.train.exponential_decay(
+                learning_rate,
+                self.global_step,
+                decay_steps,
+                0.5,
+                staircase=False,
+                name="lr_decay",
+            )
             optimizer = tf.train.AdamOptimizer(learning_rate)
             gradients, variables = zip(*optimizer.compute_gradients(loss))
             gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
@@ -361,25 +342,19 @@ class Text2ImageMatchingModel:
                 zip(gradients, variables), global_step=self.global_step
             )
 
-    def init(
-        self, sess: tf.Session, checkpoint_path: str, imagenet_checkpoint: bool
-    ) -> None:
+    def init(self, sess: tf.Session, checkpoint_path: str = None) -> None:
         """Initializes all variables in the graph.
 
         Args:
             sess: The active session.
             checkpoint_path: Path to a valid checkpoint.
-            imagenet_checkpoint: Whether the checkpoint points to a model pretrained on
-            imagenet or a full model.
 
         Returns:
             None
 
         """
         sess.run(tf.global_variables_initializer())
-        if imagenet_checkpoint:
-            self.image_encoder_loader.restore(sess, checkpoint_path)
-        else:
+        if checkpoint_path is not None:
             self.saver_loader.restore(sess, checkpoint_path)
 
     def add_summary_graph(self, sess: tf.Session) -> None:
@@ -436,22 +411,3 @@ class Text2ImageMatchingModel:
 
         """
         self.saver_loader.save(sess, save_path + self.name)
-
-    @staticmethod
-    def get_vars(scope_names: List[str]) -> List[tf.Variable]:
-        """Gets the variables from multiple scopes and collects them in a list.
-
-        Args:
-            scope_names: A list of scope names.
-
-        Returns:
-            The collected variables.
-
-        """
-        return [
-            variable
-            for scope_name in scope_names
-            for variable in tf.get_collection(
-                tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_name
-            )
-        ]

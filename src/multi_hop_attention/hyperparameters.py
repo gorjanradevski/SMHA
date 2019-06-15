@@ -11,12 +11,13 @@ from typing import Dict, Any
 import logging
 import pickle
 import sys
+import absl.logging
 
 from utils.datasets import FlickrDataset, PascalSentencesDataset, get_vocab_size
-from multi_hop_attention.models import Text2ImageMatchingModel
+from multi_hop_attention.models import MultiHopAttentionModel
 from multi_hop_attention.loaders import TrainValLoader
 from utils.evaluators import Evaluator
-from utils.constants import min_unk_sub
+from utils.constants import min_unk_sub, decay_rate_epochs
 
 logging.getLogger("utils.datasets").setLevel(logging.ERROR)
 logging.getLogger("multi_hop_attention.models").setLevel(logging.ERROR)
@@ -25,6 +26,10 @@ logging.getLogger("utils.evaluators").setLevel(logging.ERROR)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# https://github.com/abseil/abseil-py/issues/99
+absl.logging.set_verbosity("info")
+absl.logging.set_stderrthreshold("info")
 
 
 class YParams(HParams):
@@ -39,25 +44,18 @@ class BaseHparamsFinder(ABC):
 
     # Abstract class from which all finders must inherit
     def __init__(
-        self,
-        batch_size: int,
-        prefetch_size: int,
-        imagenet_checkpoint_path: str,
-        epochs: int,
-        recall_at: int,
+        self, batch_size: int, prefetch_size: int, epochs: int, recall_at: int
     ):
         """Defines the search space and the general attributes.
 
         Args:
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
-            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
         """
         self.batch_size = batch_size
         self.prefetch_size = prefetch_size
-        self.imagenet_checkpoint_path = imagenet_checkpoint_path
         self.epochs = epochs
         self.recall_at = recall_at
         self.last_best = sys.maxsize
@@ -71,7 +69,7 @@ class BaseHparamsFinder(ABC):
             "rnn_hidden_size": hp.choice("rnn_hidden_size", [128, 256, 512]),
             "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
             "learning_rate": hp.loguniform(
-                "learning_rate", np.log(0.00001), np.log(0.1)
+                "learning_rate", np.log(0.00001), np.log(0.01)
             ),
             "margin": hp.choice("margin", [0.02, 0.2, 0.4, 1.0, 3.0, 5.0]),
             "attn_size": hp.choice("attn_size", [16, 32, 64]),
@@ -151,7 +149,6 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         val_imgs_file_path: str,
         batch_size: int,
         prefetch_size: int,
-        imagenet_checkpoint_path: str,
         epochs: int,
         recall_at: int,
     ):
@@ -165,13 +162,10 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             val_imgs_file_path: File path to val images.
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
-            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
         """
-        super().__init__(
-            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
-        )
+        super().__init__(batch_size, prefetch_size, epochs, recall_at)
         self.images_path = images_path
         self.texts_path = texts_path
         self.train_imgs_file_path = train_imgs_file_path
@@ -214,7 +208,9 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             self.prefetch_size,
         )
         images, captions, captions_lengths = loader.get_next()
-        model = Text2ImageMatchingModel(
+
+        decay_steps = decay_rate_epochs * len(train_image_paths) / self.batch_size
+        model = MultiHopAttentionModel(
             images,
             captions,
             captions_lengths,
@@ -224,14 +220,15 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             layers,
             attn_size,
             attn_heads,
-            batch_hard,
             learning_rate,
             gradient_clip_val,
+            decay_steps,
+            batch_hard,
         )
 
         with tf.Session() as sess:
             # Initialize model
-            model.init(sess, self.imagenet_checkpoint_path, imagenet_checkpoint=True)
+            model.init(sess)
             for e in range(self.epochs):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
@@ -288,7 +285,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
         texts_path: str,
         batch_size: int,
         prefetch_size: int,
-        imagenet_checkpoint_path: str,
         epochs: int,
         recall_at: int,
     ):
@@ -300,14 +296,11 @@ class PascalHparamsFinder(BaseHparamsFinder):
             texts_path: The path to the captions.
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
-            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
-        """
 
-        super().__init__(
-            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
-        )
+        """
+        super().__init__(batch_size, prefetch_size, epochs, recall_at)
         self.images_path = images_path
         self.texts_path = texts_path
 
@@ -347,7 +340,9 @@ class PascalHparamsFinder(BaseHparamsFinder):
             self.prefetch_size,
         )
         images, captions, captions_lengths = loader.get_next()
-        model = Text2ImageMatchingModel(
+
+        decay_steps = decay_rate_epochs * len(train_image_paths) / self.batch_size
+        model = MultiHopAttentionModel(
             images,
             captions,
             captions_lengths,
@@ -357,14 +352,14 @@ class PascalHparamsFinder(BaseHparamsFinder):
             layers,
             attn_size,
             attn_heads,
-            batch_hard,
             learning_rate,
             gradient_clip_val,
+            decay_steps,
+            batch_hard,
         )
-
         with tf.Session() as sess:
             # Initialize model
-            model.init(sess, self.imagenet_checkpoint_path, imagenet_checkpoint=True)
+            model.init(sess)
             for e in range(self.epochs):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()

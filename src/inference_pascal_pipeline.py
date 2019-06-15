@@ -8,7 +8,7 @@ import absl.logging
 from utils.datasets import PascalSentencesDataset, get_vocab_size
 from multi_hop_attention.hyperparameters import YParams
 from multi_hop_attention.loaders import InferenceLoader
-from multi_hop_attention.models import Text2ImageMatchingModel
+from multi_hop_attention.models import MultiHopAttentionModel
 from utils.evaluators import Evaluator
 from utils.constants import inference_for_recall_at, min_unk_sub
 
@@ -71,7 +71,7 @@ def inference(
     images, captions, captions_lengths = loader.get_next()
     logger.info("Loader created...")
 
-    model = Text2ImageMatchingModel(
+    model = MultiHopAttentionModel(
         images,
         captions,
         captions_lengths,
@@ -81,9 +81,6 @@ def inference(
         hparams.layers,
         hparams.attn_size,
         hparams.attn_heads,
-        hparams.learning_rate,
-        hparams.gradient_clip_val,
-        hparams.batch_hard,
     )
     logger.info("Model created...")
     logger.info("Inference is starting...")
@@ -91,7 +88,7 @@ def inference(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path, imagenet_checkpoint=False)
+        model.init(sess, checkpoint_path)
         try:
             with tqdm(total=len(test_image_paths)) as pbar:
                 while True:

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 
-from multi_hop_attention.models import Text2ImageMatchingModel
+from multi_hop_attention.models import MultiHopAttentionModel
 
 
 @pytest.fixture
@@ -94,16 +94,21 @@ def batch_hard():
     return True
 
 
+@pytest.fixture
+def decay_epochs():
+    return 2
+
+
 def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
     tf.reset_default_graph()
-    input_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
-    image_encoded = Text2ImageMatchingModel.image_encoder_graph(
-        input_layer, rnn_hidden_size
+    image_inputs_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
+    image_encoded = MultiHopAttentionModel.image_encoder_graph(
+        image_inputs_layer, rnn_hidden_size
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         output_shape = sess.run(
-            image_encoded, feed_dict={input_layer: input_images_image_encoder}
+            image_encoded, feed_dict={image_inputs_layer: input_images_image_encoder}
         ).shape
     assert output_shape[0] == 50
     assert output_shape[2] == rnn_hidden_size
@@ -114,7 +119,7 @@ def test_image_encoder_batch_size_invariance(
 ):
     tf.reset_default_graph()
     input_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
-    image_encoded = Text2ImageMatchingModel.image_encoder_graph(
+    image_encoded = MultiHopAttentionModel.image_encoder_graph(
         input_layer, rnn_hidden_size
     )
     with tf.Session() as sess:
@@ -133,7 +138,7 @@ def test_text_encoder(
     captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
 ):
     tf.reset_default_graph()
-    text_encoded = Text2ImageMatchingModel.text_encoder_graph(
+    text_encoded = MultiHopAttentionModel.text_encoder_graph(
         captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
     )
     with tf.Session() as sess:
@@ -148,7 +153,7 @@ def test_joint_attention(attn_size, attn_heads, encoded_input):
     tf.reset_default_graph()
     encoded_input_shape = encoded_input.shape
     input_layer = tf.placeholder(dtype=tf.float32, shape=encoded_input_shape)
-    attention = Text2ImageMatchingModel.attention_graph(
+    attention = MultiHopAttentionModel.attention_graph(
         attn_size, attn_heads, input_layer, "siamese_attention"
     )
     with tf.Session() as sess:
@@ -178,7 +183,7 @@ def test_attended_image_text_shape(
     batch_hard,
 ):
     tf.reset_default_graph()
-    model = Text2ImageMatchingModel(
+    model = MultiHopAttentionModel(
         input_images,
         captions,
         captions_len,
@@ -190,6 +195,7 @@ def test_attended_image_text_shape(
         attn_heads,
         learning_rate,
         clip_value,
+        decay_epochs,
         batch_hard,
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]

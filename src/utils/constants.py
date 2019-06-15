@@ -18,3 +18,4 @@ inference_for_recall_at = [1, 5, 10]
 
 # Model specifics
 embedding_size = 300
+decay_rate_epochs = 3
