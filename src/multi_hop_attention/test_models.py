@@ -132,7 +132,7 @@ def test_image_encoder_batch_size_invariance(
             image_encoded, feed_dict={image_inputs_layer: input_images_image_encoder}
         )
 
-        np.testing.assert_almost_equal(output_50[:5], output_5)
+        np.testing.assert_almost_equal(output_50[:5], output_5, decimal=3)
 
 
 def test_text_encoder(

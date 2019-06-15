@@ -94,13 +94,12 @@ class MultiHopAttentionModel:
 
         """
         with tf.variable_scope("image_encoder"):
-            vgg19 = tf.keras.applications.VGG19(
-                include_top=False, weights="imagenet", pooling=None
-            )
-            for layer in vgg19.layers:
-                layer.trainable = False
-            output = vgg19(images)
-            flatten = tf.reshape(output, (-1, output.shape[3]))
+            with tf.variable_scope("resnet"):
+                resnet = tf.keras.applications.ResNet50(
+                    include_top=False, weights="imagenet", pooling=None
+                )
+                output = resnet(images)
+                flatten = tf.reshape(output, (-1, output.shape[3]))
             # As per: https://arxiv.org/abs/1502.01852
             project_layer = tf.layers.dense(
                 flatten,
@@ -373,7 +372,18 @@ class MultiHopAttentionModel:
                 name="lr_decay",
             )
             optimizer = tf.train.AdamOptimizer(learning_rate)
-            gradients, variables = zip(*optimizer.compute_gradients(loss))
+            gradients, variables = zip(
+                *optimizer.compute_gradients(
+                    loss,
+                    var_list=[
+                        variable
+                        for variable in tf.get_collection(
+                            key=tf.GraphKeys.TRAINABLE_VARIABLES
+                        )
+                        if "resnet" not in variable.name
+                    ],
+                )
+            )
             gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
 
             return optimizer.apply_gradients(
