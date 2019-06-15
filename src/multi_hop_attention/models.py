@@ -97,7 +97,8 @@ class MultiHopAttentionModel:
             vgg19 = tf.keras.applications.VGG19(
                 include_top=False, weights="imagenet", pooling=None
             )
-            vgg19.trainable = False
+            for layer in vgg19.layers:
+                layer.trainable = False
             output = vgg19(images)
             flatten = tf.reshape(output, (-1, output.shape[3]))
             # As per: https://arxiv.org/abs/1502.01852
