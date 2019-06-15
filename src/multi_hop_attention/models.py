@@ -1,6 +1,7 @@
 import tensorflow as tf
 import logging
 from typing import Tuple
+from tensorflow.contrib import slim
 
 from utils.constants import embedding_size
 
@@ -73,9 +74,12 @@ class MultiHopAttentionModel:
         self.loss = self.compute_loss(
             margin, batch_hard, use_gor, attn_heads, rnn_hidden_size
         )
-
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
+        )
+        # ImageNet graph loader and graph saver/loader
+        self.image_encoder_loader = tf.train.Saver(
+            tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_19")
         )
         self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")
@@ -93,14 +97,37 @@ class MultiHopAttentionModel:
             The encoded image.
 
         """
-        with tf.variable_scope("image_encoder"):
-            with tf.variable_scope("resnet"):
-                resnet = tf.keras.applications.ResNet50(
-                    include_top=False, weights="imagenet", pooling=None
+        # As per: https://arxiv.org/abs/1409.1556
+        with tf.variable_scope("vgg_19", "vgg_19", [images]) as sc:
+            end_points_collection = sc.original_name_scope + "_end_points"
+            # Collect outputs for conv2d and max_pool2d.
+            with slim.arg_scope(
+                [slim.conv2d, slim.max_pool2d],
+                outputs_collections=end_points_collection,
+            ):
+                net = slim.repeat(
+                    images, 2, slim.conv2d, 64, [3, 3], scope="conv1", trainable=False
                 )
-                output = resnet(images)
-                flatten = tf.reshape(output, (-1, output.shape[3]))
-            # As per: https://arxiv.org/abs/1502.01852
+                net = slim.max_pool2d(net, [2, 2], scope="pool1")
+                net = slim.repeat(
+                    net, 2, slim.conv2d, 128, [3, 3], scope="conv2", trainable=False
+                )
+                net = slim.max_pool2d(net, [2, 2], scope="pool2")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 256, [3, 3], scope="conv3", trainable=False
+                )
+                net = slim.max_pool2d(net, [2, 2], scope="pool3")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 512, [3, 3], scope="conv4", trainable=False
+                )
+                net = slim.max_pool2d(net, [2, 2], scope="pool4")
+                net = slim.repeat(
+                    net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
+                )
+                net = slim.max_pool2d(net, [2, 2], scope="pool5")
+
+        with tf.variable_scope("image_encoder"):
+            flatten = tf.reshape(net, (-1, net.shape[3]))
             project_layer = tf.layers.dense(
                 flatten,
                 rnn_hidden_size,
@@ -108,7 +135,7 @@ class MultiHopAttentionModel:
             )
 
             return tf.reshape(
-                project_layer, (-1, output.shape[1] * output.shape[2], rnn_hidden_size)
+                project_layer, (-1, net.shape[1] * net.shape[2], rnn_hidden_size)
             )
 
     @staticmethod
@@ -372,37 +399,32 @@ class MultiHopAttentionModel:
                 name="lr_decay",
             )
             optimizer = tf.train.AdamOptimizer(learning_rate)
-            gradients, variables = zip(
-                *optimizer.compute_gradients(
-                    loss,
-                    var_list=[
-                        variable
-                        for variable in tf.get_collection(
-                            key=tf.GraphKeys.TRAINABLE_VARIABLES
-                        )
-                        if "resnet" not in variable.name
-                    ],
-                )
-            )
+            gradients, variables = zip(*optimizer.compute_gradients(loss))
             gradients, _ = tf.clip_by_global_norm(gradients, clip_value)
 
             return optimizer.apply_gradients(
                 zip(gradients, variables), global_step=self.global_step
             )
 
-    def init(self, sess: tf.Session, checkpoint_path: str = None) -> None:
+    def init(
+        self, sess: tf.Session, checkpoint_path, imagenet_checkpoint: bool
+    ) -> None:
         """Initializes all variables in the graph.
 
         Args:
             sess: The active session.
             checkpoint_path: Path to a valid checkpoint.
+            imagenet_checkpoint: Whether the checkpoint points to a model pretrained on
+            imagenet or a full model.
 
         Returns:
             None
 
         """
         sess.run(tf.global_variables_initializer())
-        if checkpoint_path is not None:
+        if imagenet_checkpoint:
+            self.image_encoder_loader.restore(sess, checkpoint_path)
+        else:
             self.saver_loader.restore(sess, checkpoint_path)
 
     def add_summary_graph(self, sess: tf.Session) -> None:

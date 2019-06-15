@@ -33,6 +33,7 @@ def train(
     batch_size: int,
     prefetch_size: int,
     checkpoint_path: str,
+    imagenet_checkpoint: bool,
     save_model_path: str,
     log_model_path: str,
     learning_rate: float = None,
@@ -52,6 +53,7 @@ def train(
         batch_size: The batch size to be used.
         prefetch_size: The size of the prefetch on gpu.
         checkpoint_path: Path to a valid model checkpoint.
+        imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         learning_rate: If provided update the one in hparams.
@@ -88,7 +90,7 @@ def train(
     logger.info("Evaluators created...")
 
     # Resetting the default graph and setting the random seed
-    tf.keras.backend.clear_session()
+    tf.reset_default_graph()
     tf.set_random_seed(hparams.seed)
 
     loader = TrainValLoader(
@@ -129,7 +131,7 @@ def train(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path)
+        model.init(sess, checkpoint_path, imagenet_checkpoint)
         model.add_summary_graph(sess)
 
         for e in range(epochs):
@@ -220,6 +222,7 @@ def main():
         args.batch_size,
         args.prefetch_size,
         args.checkpoint_path,
+        args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
     )
@@ -266,7 +269,15 @@ def parse_args():
         help="Path where the val json file with the captions and image ids.",
     )
     parser.add_argument(
-        "--checkpoint_path", type=str, default=None, help="Path to a model checkpoint."
+        "--checkpoint_path",
+        type=str,
+        default="models/image_encoders/vgg_19.ckpt",
+        help="Path to a model checkpoint.",
+    )
+    parser.add_argument(
+        "--imagenet_checkpoint",
+        action="store_true",
+        help="If the checkpoint is an imagenet checkpoint.",
     )
     parser.add_argument(
         "--log_model_path",

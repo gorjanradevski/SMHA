@@ -88,7 +88,7 @@ def inference(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path)
+        model.init(sess, checkpoint_path, imagenet_checkpoint=False)
         try:
             with tqdm(total=len(test_image_paths)) as pbar:
                 while True:
@@ -160,6 +160,11 @@ def parse_args():
         type=str,
         default="models/image_encoders/vgg_19.ckpt",
         help="Path to a model checkpoint.",
+    )
+    parser.add_argument(
+        "--imagenet_checkpoint",
+        action="store_true",
+        help="If the checkpoint is an imagenet checkpoint.",
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."

@@ -44,7 +44,12 @@ class BaseHparamsFinder(ABC):
 
     # Abstract class from which all finders must inherit
     def __init__(
-        self, batch_size: int, prefetch_size: int, epochs: int, recall_at: int
+        self,
+        batch_size: int,
+        prefetch_size: int,
+        imagenet_checkpoint_path: str,
+        epochs: int,
+        recall_at: int,
     ):
         """Defines the search space and the general attributes.
 
@@ -56,6 +61,7 @@ class BaseHparamsFinder(ABC):
         """
         self.batch_size = batch_size
         self.prefetch_size = prefetch_size
+        self.imagenet_checkpoint_path = imagenet_checkpoint_path
         self.epochs = epochs
         self.recall_at = recall_at
         self.last_best = sys.maxsize
@@ -150,6 +156,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         val_imgs_file_path: str,
         batch_size: int,
         prefetch_size: int,
+        imagenet_checkpoint_path: str,
         epochs: int,
         recall_at: int,
     ):
@@ -163,10 +170,13 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             val_imgs_file_path: File path to val images.
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
+            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
         """
-        super().__init__(batch_size, prefetch_size, epochs, recall_at)
+        super().__init__(
+            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
+        )
         self.images_path = images_path
         self.texts_path = texts_path
         self.train_imgs_file_path = train_imgs_file_path
@@ -196,7 +206,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * attn_heads)
 
         # Resetting the default graph and setting the random seed
-        tf.keras.backend.clear_session()
+        tf.reset_default_graph()
         tf.set_random_seed(self.seed)
 
         loader = TrainValLoader(
@@ -231,7 +241,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
 
         with tf.Session() as sess:
             # Initialize model
-            model.init(sess)
+            model.init(sess, self.imagenet_checkpoint_path, imagenet_checkpoint=True)
             for e in range(self.epochs):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
@@ -288,6 +298,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         texts_path: str,
         batch_size: int,
         prefetch_size: int,
+        imagenet_checkpoint_path: str,
         epochs: int,
         recall_at: int,
     ):
@@ -299,11 +310,14 @@ class PascalHparamsFinder(BaseHparamsFinder):
             texts_path: The path to the captions.
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
+            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
 
         """
-        super().__init__(batch_size, prefetch_size, epochs, recall_at)
+        super().__init__(
+            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
+        )
         self.images_path = images_path
         self.texts_path = texts_path
 
@@ -330,7 +344,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * attn_heads)
 
         # Resetting the default graph and setting the random seed
-        tf.keras.backend.clear_session()
+        tf.reset_default_graph()
         tf.set_random_seed(self.seed)
 
         loader = TrainValLoader(
@@ -364,7 +378,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         )
         with tf.Session() as sess:
             # Initialize model
-            model.init(sess)
+            model.init(sess, self.imagenet_checkpoint_path, imagenet_checkpoint=True)
             for e in range(self.epochs):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
