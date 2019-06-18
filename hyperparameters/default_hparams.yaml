@@ -1,7 +1,5 @@
 name: DEFLT
-layers: 1
-rnn_hidden_size: 512
-keep_prob: 0.7
+joint_space: 512
 learning_rate: 0.0002
 margin: 0.5
 attn_size: 50

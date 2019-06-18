@@ -1,8 +1,3 @@
-# Dataset specifics
-PAD_ID = 0
-UNK_ID = 1
-min_unk_sub = 4
-
 # Imagenet specifics
 WIDTH = 224
 HEIGHT = 224

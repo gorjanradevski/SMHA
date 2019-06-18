@@ -18,12 +18,7 @@ def train_image_paths():
 
 @pytest.fixture
 def train_captions():
-    return [[1, 2, 3, 4], [5, 6], [7, 8, 9, 10, 11], [12], [13, 14, 15]]
-
-
-@pytest.fixture
-def train_captions_lengths():
-    return [[4], [2], [5], [1], [3]]
+    return ["i will go to", "you won't", "she did do it yes", "no", "bro you are"]
 
 
 @pytest.fixture
@@ -37,12 +32,7 @@ def val_image_paths():
 
 @pytest.fixture
 def val_captions():
-    return [[1, 2], [3, 4, 5], [6]]
-
-
-@pytest.fixture
-def val_captions_lengths():
-    return [[2], [3], [1]]
+    return ["same for", "the fish jumped", "no"]
 
 
 @pytest.fixture
@@ -63,10 +53,8 @@ def prefetch_size():
 def test_train_val_loader_shapes(
     train_image_paths,
     train_captions,
-    train_captions_lengths,
     val_image_paths,
     val_captions,
-    val_captions_lengths,
     epochs,
     batch_size,
     prefetch_size,
@@ -75,10 +63,8 @@ def test_train_val_loader_shapes(
     loader = TrainValLoader(
         train_image_paths,
         train_captions,
-        train_captions_lengths,
         val_image_paths,
         val_captions,
-        val_captions_lengths,
         batch_size,
         prefetch_size,
     )
@@ -123,10 +109,8 @@ def test_train_val_loader_shapes(
 def test_train_val_loader_batch_size_invariance_val(
     train_image_paths,
     train_captions,
-    train_captions_lengths,
     val_image_paths,
     val_captions,
-    val_captions_lengths,
     epochs,
     prefetch_size,
 ):
@@ -135,10 +119,8 @@ def test_train_val_loader_batch_size_invariance_val(
     loader_5 = TrainValLoader(
         train_image_paths,
         train_captions,
-        train_captions_lengths,
         val_image_paths,
         val_captions,
-        val_captions_lengths,
         5,
         prefetch_size,
     )
@@ -154,10 +136,8 @@ def test_train_val_loader_batch_size_invariance_val(
     loader_3 = TrainValLoader(
         train_image_paths,
         train_captions,
-        train_captions_lengths,
         val_image_paths,
         val_captions,
-        val_captions_lengths,
         3,
         prefetch_size,
     )
@@ -176,22 +156,15 @@ def test_train_val_loader_batch_size_invariance_val(
 
 
 def test_train_val_loader_all_elements_val_taken(
-    train_image_paths,
-    train_captions,
-    train_captions_lengths,
-    val_image_paths,
-    val_captions,
-    val_captions_lengths,
+    train_image_paths, train_captions, val_image_paths, val_captions
 ):
     for batch_size in range(1, len(val_captions)):
         tf.reset_default_graph()
         loader = TrainValLoader(
             train_image_paths,
             train_captions,
-            train_captions_lengths,
             val_image_paths,
             val_captions,
-            val_captions_lengths,
             batch_size,
             1,
         )
@@ -208,20 +181,17 @@ def test_train_val_loader_all_elements_val_taken(
                         batch_lengths,
                         val_captions[index : index + batch_size],
                     ):
-                        np.testing.assert_array_equal(caption[:length], val_cap)
+                        caption_decoded = [word.decode() for word in caption[:length]]
+                        np.testing.assert_array_equal(caption_decoded, val_cap.split())
                     index += len(batch_caps)
             except tf.errors.OutOfRangeError:
                 pass
 
 
-def test_inference_loader(
-    val_image_paths, val_captions, val_captions_lengths, batch_size, prefetch_size
-):
+def test_inference_loader(val_image_paths, val_captions, batch_size, prefetch_size):
     # Using the validation fixtures since it wouldn't make any difference
     tf.reset_default_graph()
-    loader = InferenceLoader(
-        val_image_paths, val_captions, val_captions_lengths, batch_size, prefetch_size
-    )
+    loader = InferenceLoader(val_image_paths, val_captions, batch_size, prefetch_size)
     images, captions, captions_lengths = loader.get_next()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())

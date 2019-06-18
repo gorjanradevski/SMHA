@@ -5,12 +5,12 @@ from tqdm import tqdm
 import os
 import absl.logging
 
-from utils.datasets import TrainCocoDataset, ValCocoDataset, get_vocab_size
+from utils.datasets import TrainCocoDataset, ValCocoDataset
 from multi_hop_attention.hyperparameters import YParams
 from multi_hop_attention.loaders import TrainValLoader
 from multi_hop_attention.models import MultiHopAttentionModel
 from utils.evaluators import Evaluator
-from utils.constants import min_unk_sub, decay_rate_epochs
+from utils.constants import decay_rate_epochs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -74,11 +74,11 @@ def train(
     # If attn_heads is provided update the hparams attn_heads
     if attn_heads is not None:
         hparams.set_hparam("attn_heads", attn_heads)
-    train_dataset = TrainCocoDataset(train_images_path, train_json_path, min_unk_sub)
-    train_image_paths, train_captions, train_captions_lengths = train_dataset.get_data()
+    train_dataset = TrainCocoDataset(train_images_path, train_json_path)
+    train_image_paths, train_captions = train_dataset.get_data()
     logger.info("Train dataset created...")
     val_dataset = ValCocoDataset(val_images_path, val_json_path)
-    val_image_paths, val_captions, val_captions_lengths = val_dataset.get_data()
+    val_image_paths, val_captions = val_dataset.get_data()
     logger.info("Validation dataset created...")
 
     evaluator_train = Evaluator()
@@ -96,10 +96,8 @@ def train(
     loader = TrainValLoader(
         train_image_paths,
         train_captions,
-        train_captions_lengths,
         val_image_paths,
         val_captions,
-        val_captions_lengths,
         batch_size,
         prefetch_size,
     )
@@ -112,9 +110,7 @@ def train(
         captions,
         captions_lengths,
         hparams.margin,
-        hparams.rnn_hidden_size,
-        get_vocab_size(TrainCocoDataset),
-        hparams.layers,
+        hparams.joint_space,
         hparams.attn_size,
         hparams.attn_heads,
         hparams.learning_rate,
@@ -146,10 +142,7 @@ def train(
                     while True:
                         _, loss, lengths = sess.run(
                             [model.optimize, model.loss, model.captions_len],
-                            feed_dict={
-                                model.keep_prob: hparams.keep_prob,
-                                model.frob_norm_pen: hparams.frob_norm_pen,
-                            },
+                            feed_dict={model.frob_norm_pen: hparams.frob_norm_pen},
                         )
                         evaluator_train.update_metrics(loss)
                         pbar.update(len(lengths))
@@ -225,6 +218,9 @@ def main():
         args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
+        args.learning_rate,
+        args.frob_norm_pen,
+        args.attn_heads,
     )
 
 

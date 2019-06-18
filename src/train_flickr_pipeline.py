@@ -5,12 +5,12 @@ from tqdm import tqdm
 import os
 import absl.logging
 
-from utils.datasets import FlickrDataset, get_vocab_size
+from utils.datasets import FlickrDataset
 from multi_hop_attention.hyperparameters import YParams
 from multi_hop_attention.loaders import TrainValLoader
 from multi_hop_attention.models import MultiHopAttentionModel
 from utils.evaluators import Evaluator
-from utils.constants import min_unk_sub, decay_rate_epochs
+from utils.constants import decay_rate_epochs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -74,20 +74,15 @@ def train(
     # If attn_heads is provided update the hparams attn_heads
     if attn_heads is not None:
         hparams.set_hparam("attn_heads", attn_heads)
-    dataset = FlickrDataset(images_path, texts_path, min_unk_sub)
-    train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
-        train_imgs_file_path
-    )
-    val_image_paths, val_captions, val_captions_lengths = dataset.get_data(
-        val_imgs_file_path
-    )
+    dataset = FlickrDataset(images_path, texts_path)
+    train_image_paths, train_captions = dataset.get_data(train_imgs_file_path)
+    val_image_paths, val_captions = dataset.get_data(val_imgs_file_path)
     logger.info("Train dataset created...")
     logger.info("Validation dataset created...")
 
     evaluator_train = Evaluator()
-    # The number of features at the output will be: rnn_hidden_size * attn_heads
     evaluator_val = Evaluator(
-        len(val_image_paths), hparams.rnn_hidden_size * hparams.attn_heads
+        len(val_image_paths), hparams.joint_space * hparams.attn_heads
     )
 
     logger.info("Evaluators created...")
@@ -99,10 +94,8 @@ def train(
     loader = TrainValLoader(
         train_image_paths,
         train_captions,
-        train_captions_lengths,
         val_image_paths,
         val_captions,
-        val_captions_lengths,
         batch_size,
         prefetch_size,
     )
@@ -115,9 +108,7 @@ def train(
         captions,
         captions_lengths,
         hparams.margin,
-        hparams.rnn_hidden_size,
-        get_vocab_size(FlickrDataset),
-        hparams.layers,
+        hparams.joint_space,
         hparams.attn_size,
         hparams.attn_heads,
         hparams.learning_rate,
@@ -149,10 +140,7 @@ def train(
                     while True:
                         _, loss, lengths = sess.run(
                             [model.optimize, model.loss, model.captions_len],
-                            feed_dict={
-                                model.keep_prob: hparams.keep_prob,
-                                model.frob_norm_pen: hparams.frob_norm_pen,
-                            },
+                            feed_dict={model.frob_norm_pen: hparams.frob_norm_pen},
                         )
                         evaluator_train.update_metrics(loss)
                         pbar.update(len(lengths))
@@ -228,6 +216,9 @@ def main():
         args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
+        args.learning_rate,
+        args.frob_norm_pen,
+        args.attn_heads,
     )
 
 

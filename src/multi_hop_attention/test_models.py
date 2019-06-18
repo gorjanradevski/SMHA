@@ -7,7 +7,7 @@ from multi_hop_attention.models import MultiHopAttentionModel
 
 
 @pytest.fixture
-def rnn_hidden_size():
+def joint_space():
     return 50
 
 
@@ -30,32 +30,21 @@ def seed():
 
 @pytest.fixture
 def captions():
-    return np.array([[2, 5, 4, 6, 8], [9, 11, 0, 0, 0], [12, 7, 3, 10, 0]])
+    return [
+        ["goes", "to", "the", "shop", "where"],
+        ["nobody", "really", "", "", ""],
+        ["will", "see", "now", "what", ""],
+    ]
 
 
 @pytest.fixture
 def captions_len():
-    return np.array([5, 2, 4])
+    return [5, 2, 4]
 
 
 @pytest.fixture
 def margin():
     return 2
-
-
-@pytest.fixture
-def vocab_size():
-    return 13
-
-
-@pytest.fixture
-def num_layers():
-    return 2
-
-
-@pytest.fixture
-def keep_prob():
-    return 0.5
 
 
 @pytest.fixture
@@ -99,11 +88,11 @@ def decay_epochs():
     return 2
 
 
-def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
+def test_image_encoder(input_images_image_encoder, joint_space):
     tf.reset_default_graph()
     image_inputs_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
     image_encoded = MultiHopAttentionModel.image_encoder_graph(
-        image_inputs_layer, rnn_hidden_size
+        image_inputs_layer, joint_space
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -111,16 +100,14 @@ def test_image_encoder(input_images_image_encoder, rnn_hidden_size):
             image_encoded, feed_dict={image_inputs_layer: input_images_image_encoder}
         ).shape
     assert output_shape[0] == 50
-    assert output_shape[2] == rnn_hidden_size
+    assert output_shape[2] == joint_space
 
 
-def test_image_encoder_batch_size_invariance(
-    input_images_image_encoder, rnn_hidden_size
-):
+def test_image_encoder_batch_size_invariance(input_images_image_encoder, joint_space):
     tf.reset_default_graph()
     image_inputs_layer = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
     image_encoded = MultiHopAttentionModel.image_encoder_graph(
-        image_inputs_layer, rnn_hidden_size
+        image_inputs_layer, joint_space
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -135,19 +122,17 @@ def test_image_encoder_batch_size_invariance(
         np.testing.assert_almost_equal(output_50[:5], output_5, decimal=3)
 
 
-def test_text_encoder(
-    captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
-):
+def test_text_encoder(captions, captions_len, joint_space):
     tf.reset_default_graph()
     text_encoded = MultiHopAttentionModel.text_encoder_graph(
-        captions, captions_len, vocab_size, rnn_hidden_size, num_layers, keep_prob
+        captions, captions_len, joint_space
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         outputs = sess.run(text_encoded).shape
     assert outputs[0] == 3
     assert outputs[1] == 5
-    assert outputs[2] == rnn_hidden_size
+    assert outputs[2] == joint_space
 
 
 def test_joint_attention(attn_size, attn_heads, encoded_input):
@@ -174,9 +159,7 @@ def test_attended_image_text_shape(
     captions,
     captions_len,
     margin,
-    rnn_hidden_size,
-    vocab_size,
-    num_layers,
+    joint_space,
     attn_size,
     attn_heads,
     learning_rate,
@@ -185,15 +168,7 @@ def test_attended_image_text_shape(
 ):
     tf.reset_default_graph()
     model = MultiHopAttentionModel(
-        input_images,
-        captions,
-        captions_len,
-        margin,
-        rnn_hidden_size,
-        vocab_size,
-        num_layers,
-        attn_size,
-        attn_heads,
+        input_images, captions, captions_len, margin, joint_space, attn_size, attn_heads
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]

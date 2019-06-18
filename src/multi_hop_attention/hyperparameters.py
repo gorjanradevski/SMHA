@@ -13,11 +13,11 @@ import pickle
 import sys
 import absl.logging
 
-from utils.datasets import FlickrDataset, PascalSentencesDataset, get_vocab_size
+from utils.datasets import FlickrDataset, PascalSentencesDataset
 from multi_hop_attention.models import MultiHopAttentionModel
 from multi_hop_attention.loaders import TrainValLoader
 from utils.evaluators import Evaluator
-from utils.constants import min_unk_sub, decay_rate_epochs
+from utils.constants import decay_rate_epochs
 
 logging.getLogger("utils.datasets").setLevel(logging.ERROR)
 logging.getLogger("multi_hop_attention.models").setLevel(logging.ERROR)
@@ -71,9 +71,7 @@ class BaseHparamsFinder(ABC):
         self.name = "".join(random.choice(string.ascii_uppercase) for _ in range(5))
         # Define the search space
         self.search_space = {
-            "layers": hp.choice("layers", [1, 2, 3]),
-            "rnn_hidden_size": hp.choice("rnn_hidden_size", [128, 256, 512]),
-            "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
+            "joint_space": hp.choice("joint_space", [256, 512, 1024]),
             "learning_rate": hp.loguniform(
                 "learning_rate", np.log(0.00001), np.log(0.01)
             ),
@@ -183,27 +181,20 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         self.val_imgs_file_path = val_imgs_file_path
 
     def objective(self, args: Dict[str, Any]):
-        rnn_hidden_size = args["rnn_hidden_size"]
-        layers = args["layers"]
+        joint_space = args["joint_space"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
-        keep_prob = args["keep_prob"]
         margin = args["margin"]
         batch_hard = args["batch_hard"]
         use_gor = args["use_gor"]
 
-        dataset = FlickrDataset(self.images_path, self.texts_path, min_unk_sub)
-        train_image_paths, train_captions, train_captions_lengths = dataset.get_data(
-            self.train_imgs_file_path
-        )
-        val_image_paths, val_captions, val_captions_lengths = dataset.get_data(
-            self.val_imgs_file_path
-        )
-        # The number of features at the output will be: rnn_hidden_size * attn_heads
-        evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * attn_heads)
+        dataset = FlickrDataset(self.images_path, self.texts_path)
+        train_image_paths, train_captions = dataset.get_data(self.train_imgs_file_path)
+        val_image_paths, val_captions = dataset.get_data(self.val_imgs_file_path)
+        evaluator_val = Evaluator(len(val_image_paths), joint_space * attn_heads)
 
         # Resetting the default graph and setting the random seed
         tf.reset_default_graph()
@@ -212,10 +203,8 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         loader = TrainValLoader(
             train_image_paths,
             train_captions,
-            train_captions_lengths,
             val_image_paths,
             val_captions,
-            val_captions_lengths,
             self.batch_size,
             self.prefetch_size,
         )
@@ -227,9 +216,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             captions,
             captions_lengths,
             margin,
-            rnn_hidden_size,
-            get_vocab_size(FlickrDataset),
-            layers,
+            joint_space,
             attn_size,
             attn_heads,
             learning_rate,
@@ -252,10 +239,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                     while True:
                         _, loss = sess.run(
                             [model.optimize, model.loss],
-                            feed_dict={
-                                model.keep_prob: keep_prob,
-                                model.frob_norm_pen: frob_norm_pen,
-                            },
+                            feed_dict={model.frob_norm_pen: frob_norm_pen},
                         )
                 except tf.errors.OutOfRangeError:
                     pass
@@ -322,26 +306,21 @@ class PascalHparamsFinder(BaseHparamsFinder):
         self.texts_path = texts_path
 
     def objective(self, args: Dict[str, Any]):
-        rnn_hidden_size = args["rnn_hidden_size"]
-        layers = args["layers"]
+        joint_space = args["joint_space"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
-        keep_prob = args["keep_prob"]
         margin = args["margin"]
         batch_hard = args["batch_hard"]
         use_gor = args["use_gor"]
 
-        dataset = PascalSentencesDataset(self.images_path, self.texts_path, min_unk_sub)
-        train_image_paths, train_captions, train_captions_lengths = (
-            dataset.get_train_data()
-        )
+        dataset = PascalSentencesDataset(self.images_path, self.texts_path)
+        train_image_paths, train_captions = dataset.get_train_data()
         # Getting the vocabulary size of the train dataset
-        val_image_paths, val_captions, val_captions_lengths = dataset.get_val_data()
-        # The number of features at the output will be: rnn_hidden_size * attn_heads
-        evaluator_val = Evaluator(len(val_image_paths), rnn_hidden_size * attn_heads)
+        val_image_paths, val_captions = dataset.get_val_data()
+        evaluator_val = Evaluator(len(val_image_paths), joint_space * attn_heads)
 
         # Resetting the default graph and setting the random seed
         tf.reset_default_graph()
@@ -350,10 +329,8 @@ class PascalHparamsFinder(BaseHparamsFinder):
         loader = TrainValLoader(
             train_image_paths,
             train_captions,
-            train_captions_lengths,
             val_image_paths,
             val_captions,
-            val_captions_lengths,
             self.batch_size,
             self.prefetch_size,
         )
@@ -365,9 +342,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
             captions,
             captions_lengths,
             margin,
-            rnn_hidden_size,
-            get_vocab_size(PascalSentencesDataset),
-            layers,
+            joint_space,
             attn_size,
             attn_heads,
             learning_rate,
@@ -389,10 +364,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
                     while True:
                         _, loss = sess.run(
                             [model.optimize, model.loss],
-                            feed_dict={
-                                model.keep_prob: keep_prob,
-                                model.frob_norm_pen: frob_norm_pen,
-                            },
+                            feed_dict={model.frob_norm_pen: frob_norm_pen},
                         )
                 except tf.errors.OutOfRangeError:
                     pass

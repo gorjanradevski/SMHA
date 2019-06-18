@@ -5,12 +5,12 @@ from tqdm import tqdm
 import os
 import absl.logging
 
-from utils.datasets import PascalSentencesDataset, get_vocab_size
+from utils.datasets import PascalSentencesDataset
 from multi_hop_attention.hyperparameters import YParams
 from multi_hop_attention.loaders import InferenceLoader
 from multi_hop_attention.models import MultiHopAttentionModel
 from utils.evaluators import Evaluator
-from utils.constants import inference_for_recall_at, min_unk_sub
+from utils.constants import inference_for_recall_at
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,13 +46,12 @@ def inference(
 
     """
     hparams = YParams(hparams_path)
-    dataset = PascalSentencesDataset(images_path, texts_path, min_unk_sub)
+    dataset = PascalSentencesDataset(images_path, texts_path)
     # Getting the vocabulary size of the train dataset
-    test_image_paths, test_captions, test_captions_lengths = dataset.get_test_data()
+    test_image_paths, test_captions = dataset.get_test_data()
     logger.info("Test dataset created...")
-    # The number of features at the output will be: rnn_hidden_size * attn_heads
     evaluator_test = Evaluator(
-        len(test_image_paths), hparams.rnn_hidden_size * hparams.attn_heads
+        len(test_image_paths), hparams.joint_space * hparams.attn_heads
     )
 
     logger.info("Test evaluator created...")
@@ -61,13 +60,7 @@ def inference(
     tf.reset_default_graph()
     tf.set_random_seed(hparams.seed)
 
-    loader = InferenceLoader(
-        test_image_paths,
-        test_captions,
-        test_captions_lengths,
-        batch_size,
-        prefetch_size,
-    )
+    loader = InferenceLoader(test_image_paths, test_captions, batch_size, prefetch_size)
     images, captions, captions_lengths = loader.get_next()
     logger.info("Loader created...")
 
@@ -76,9 +69,7 @@ def inference(
         captions,
         captions_lengths,
         hparams.margin,
-        hparams.rnn_hidden_size,
-        get_vocab_size(PascalSentencesDataset),
-        hparams.layers,
+        hparams.joint_space,
         hparams.attn_size,
         hparams.attn_heads,
     )

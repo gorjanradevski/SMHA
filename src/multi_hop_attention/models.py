@@ -2,8 +2,7 @@ import tensorflow as tf
 import logging
 from typing import Tuple
 from tensorflow.contrib import slim
-
-from utils.constants import embedding_size
+import tensorflow_hub as hub
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,9 +15,7 @@ class MultiHopAttentionModel:
         captions: tf.Tensor,
         captions_len: tf.Tensor,
         margin: int,
-        rnn_hidden_size: int,
-        vocab_size: int,
-        num_layers: int,
+        joint_space: int,
         attn_size: int,
         attn_heads: int,
         learning_rate: float = 0.0,
@@ -47,20 +44,14 @@ class MultiHopAttentionModel:
             )
         self.global_step = tf.Variable(0, trainable=False, name="global_step")
         # Create dropout and weight decay placeholder
-        self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         self.frob_norm_pen = tf.placeholder_with_default(
             0.0, None, name="frob_norm_pen"
         )
         # Build model
-        self.image_encoded = self.image_encoder_graph(self.images, rnn_hidden_size)
+        self.image_encoded = self.image_encoder_graph(self.images, joint_space)
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
-            self.captions,
-            self.captions_len,
-            vocab_size,
-            rnn_hidden_size,
-            num_layers,
-            self.keep_prob,
+            self.captions, self.captions_len, joint_space
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.attention_graph(
@@ -72,7 +63,7 @@ class MultiHopAttentionModel:
         )
         logger.info("Attention graph created...")
         self.loss = self.compute_loss(
-            margin, batch_hard, use_gor, attn_heads, rnn_hidden_size
+            margin, batch_hard, use_gor, attn_heads, joint_space
         )
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
@@ -85,13 +76,14 @@ class MultiHopAttentionModel:
         logger.info("Graph creation finished...")
 
     @staticmethod
-    def image_encoder_graph(images: tf.Tensor, rnn_hidden_size: int) -> tf.Tensor:
+    def image_encoder_graph(images: tf.Tensor, joint_space: int) -> tf.Tensor:
         """Extract higher level features from the image using a conv vgg19 pretrained on
         Image net.
 
         Args:
             images: The input images.
-            rnn_hidden_size: The hidden size of its text counterpart.
+            joint_space: The space where the encoded images and text are going to be
+            projected to.
 
         Returns:
             The encoded image.
@@ -129,70 +121,41 @@ class MultiHopAttentionModel:
         with tf.variable_scope("image_encoder"):
             flatten = tf.reshape(net, (-1, net.shape[3]))
             project_layer = tf.layers.dense(
-                flatten,
-                rnn_hidden_size,
-                kernel_initializer=tf.glorot_uniform_initializer(),
+                flatten, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
             )
 
             return tf.reshape(
-                project_layer, (-1, net.shape[1] * net.shape[2], rnn_hidden_size)
+                project_layer, (-1, net.shape[1] * net.shape[2], joint_space)
             )
 
     @staticmethod
     def text_encoder_graph(
-        captions: tf.Tensor,
-        captions_len: tf.Tensor,
-        vocab_size: int,
-        rnn_hidden_size: int,
-        num_layers: int,
-        keep_prob: float,
+        captions: tf.Tensor, captions_len: tf.Tensor, joint_space: int
     ):
         """Encodes the text it gets as input using a bidirectional rnn.
 
         Args:
             captions: The inputs.
             captions_len: The length of the inputs.
-            vocab_size: The size of the vocabulary.
-            rnn_hidden_size: The size of the weight matrix in the cell.
-            num_layers: The number of layers of the rnn.
-            keep_prob: The dropout probability (1.0 means keep everything)
+            joint_space: The space where the encoded images and text are going to be
+            projected to.
 
         Returns:
             The encoded text.
 
         """
         with tf.variable_scope(name_or_scope="text_encoder"):
-            # As per: https://arxiv.org/abs/1711.09160
-            embeddings = tf.get_variable(
-                name="embeddings",
-                shape=[vocab_size, embedding_size],
-                initializer=tf.random_normal_initializer(mean=0, stddev=0.001),
+            elmo = hub.Module("https://tfhub.dev/google/elmo/2", trainable=True)
+            embeddings = elmo(
+                inputs={"tokens": captions, "sequence_len": captions_len},
+                signature="tokens",
+                as_dict=True,
+            )["elmo"]
+            flatten = tf.reshape(embeddings, (-1, embeddings.shape[2]))
+            project_layer = tf.layers.dense(
+                flatten, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
             )
-            inputs = tf.nn.embedding_lookup(embeddings, captions)
-            # As per: https://arxiv.org/abs/1406.1078
-            cell_fw = tf.nn.rnn_cell.MultiRNNCell(
-                [
-                    tf.nn.rnn_cell.DropoutWrapper(
-                        tf.nn.rnn_cell.GRUCell(rnn_hidden_size),
-                        output_keep_prob=keep_prob,
-                    )
-                    for _ in range(num_layers)
-                ]
-            )
-            cell_bw = tf.nn.rnn_cell.MultiRNNCell(
-                [
-                    tf.nn.rnn_cell.DropoutWrapper(
-                        tf.nn.rnn_cell.GRUCell(rnn_hidden_size),
-                        output_keep_prob=keep_prob,
-                    )
-                    for _ in range(num_layers)
-                ]
-            )
-            (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
-                cell_fw, cell_bw, inputs, sequence_length=captions_len, dtype=tf.float32
-            )
-
-            return tf.add(output_fw, output_bw)
+            return tf.reshape(project_layer, (-1, tf.shape(embeddings)[1], joint_space))
 
     @staticmethod
     def attention_graph(
@@ -334,7 +297,7 @@ class MultiHopAttentionModel:
         batch_hard: bool,
         use_gor: bool,
         attn_heads: int,
-        rnn_hidden_size: int,
+        joint_space: int,
     ) -> tf.Tensor:
         """Computes the final loss of the model.
 
@@ -348,7 +311,9 @@ class MultiHopAttentionModel:
             attn_heads: The number of attention heads.
             batch_hard: Whether to train only on the hard negatives.
             use_gor: Whether to compute the global orthogonal regularization.
-            rnn_hidden_size: The size of the cell of the rnn.
+            joint_space: The space where the encoded images and text are going to be
+            projected to.
+
 
         Returns:
             The final loss to be optimized.
@@ -361,7 +326,7 @@ class MultiHopAttentionModel:
             triplet_loss = self.triplet_loss(scores, margin, batch_hard)
             gor = 0.0
             if use_gor:
-                gor = self.gor(scores, attn_heads * rnn_hidden_size)
+                gor = self.gor(scores, attn_heads * joint_space)
 
             pen_image_alphas = (
                 self.compute_frob_norm(self.image_alphas, attn_heads)
