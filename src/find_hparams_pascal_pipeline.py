@@ -12,7 +12,6 @@ def optimize(
     texts_path: str,
     batch_size: int,
     prefetch_size: int,
-    imagenet_checkpoint_path: str,
     epochs: int,
     recall_at: int,
     num_iters: int,
@@ -27,7 +26,6 @@ def optimize(
         texts_path: The path to the captions.
         batch_size: The batch size that will be used to conduct the experiments.
         prefetch_size: The prefetching size when running on GPU.
-        imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
         epochs: The number of epochs per experiment.
         recall_at: Validate on recall at K.
         num_iters: How many times to do random sampling.
@@ -39,13 +37,7 @@ def optimize(
 
     """
     hparams_finder = PascalHparamsFinder(
-        images_path,
-        texts_path,
-        batch_size,
-        prefetch_size,
-        imagenet_checkpoint_path,
-        epochs,
-        recall_at,
+        images_path, texts_path, batch_size, prefetch_size, epochs, recall_at
     )
     hparams_finder.find_best(num_iters, hparams_path, trials_path)
 
@@ -59,7 +51,6 @@ def main():
         args.texts_path,
         args.batch_size,
         args.prefetch_size,
-        args.checkpoint_path,
         args.epochs,
         args.recall_at,
         args.num_iters,
@@ -97,12 +88,6 @@ def parse_args():
         type=int,
         default=10,
         help="The number of epochs to train the model.",
-    )
-    parser.add_argument(
-        "--checkpoint_path",
-        type=str,
-        default="models/image_encoders/vgg_19.ckpt",
-        help="Path to a model checkpoint.",
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."

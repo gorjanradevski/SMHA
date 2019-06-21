@@ -31,12 +31,12 @@ def train(
     batch_size: int,
     prefetch_size: int,
     checkpoint_path: str,
-    imagenet_checkpoint: bool,
     save_model_path: str,
     log_model_path: str,
     learning_rate: float = None,
     frob_norm_pen: float = None,
     attn_heads: int = None,
+    gor_pen: float = None,
 ) -> None:
     """Starts a training session with the Pascal1k sentences dataset.
 
@@ -49,12 +49,12 @@ def train(
         batch_size: The batch size to be used.
         prefetch_size: How many batches to keep on GPU ready for processing.
         checkpoint_path: Path to a valid model checkpoint.
-        imagenet_checkpoint: Whether the checkpoint points to an imagenet model.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         learning_rate: If provided update the one in hparams.
         frob_norm_pen: If provided update the one in hparams.
         attn_heads: If provided update the one in hparams.
+        gor_pen: If provided update the one in hparams.
 
     Returns:
         None
@@ -70,6 +70,8 @@ def train(
     # If attn_heads is provided update the hparams attn_heads
     if attn_heads is not None:
         hparams.set_hparam("attn_heads", attn_heads)
+    if gor_pen is not None:
+        hparams.set_hparam("gor_pen", attn_heads)
     dataset = PascalSentencesDataset(images_path, texts_path)
     train_image_paths, train_captions = dataset.get_train_data()
     val_image_paths, val_captions = dataset.get_val_data()
@@ -110,8 +112,6 @@ def train(
         hparams.learning_rate,
         hparams.gradient_clip_val,
         decay_steps,
-        hparams.batch_hard,
-        hparams.use_gor,
         log_model_path,
         hparams.name,
     )
@@ -121,7 +121,7 @@ def train(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path, imagenet_checkpoint)
+        model.init(sess, checkpoint_path)
         model.add_summary_graph(sess)
 
         for e in range(epochs):
@@ -136,7 +136,10 @@ def train(
                     while True:
                         _, loss, lengths = sess.run(
                             [model.optimize, model.loss, model.captions_len],
-                            feed_dict={model.frob_norm_pen: hparams.frob_norm_pen},
+                            feed_dict={
+                                model.frob_norm_pen: hparams.frob_norm_pen,
+                                model.gor_pen: hparams.gor_pen,
+                            },
                         )
                         evaluator_train.update_metrics(loss)
                         pbar.update(len(lengths))
@@ -207,12 +210,12 @@ def main():
         args.batch_size,
         args.prefetch_size,
         args.checkpoint_path,
-        args.imagenet_checkpoint,
         args.save_model_path,
         args.log_model_path,
         args.learning_rate,
         args.frob_norm_pen,
         args.attn_heads,
+        args.gor_pen,
     )
 
 
@@ -245,15 +248,7 @@ def parse_args():
         help="Path to the file where the image to caption mappings are.",
     )
     parser.add_argument(
-        "--checkpoint_path",
-        type=str,
-        default="models/image_encoders/vgg_19.ckpt",
-        help="Path to a model checkpoint.",
-    )
-    parser.add_argument(
-        "--imagenet_checkpoint",
-        action="store_true",
-        help="If the checkpoint is an imagenet checkpoint.",
+        "--checkpoint_path", type=str, default=None, help="Path to a model checkpoint."
     )
     parser.add_argument(
         "--log_model_path",
@@ -298,9 +293,14 @@ def parse_args():
         "--attn_heads",
         type=int,
         default=None,
-        help="This will override the hparams attendion heads.",
+        help="This will override the hparams attention heads.",
     )
-
+    parser.add_argument(
+        "--gor_pen",
+        type=float,
+        default=None,
+        help="This will override the hparams gor penalization rate.",
+    )
     return parser.parse_args()
 
 

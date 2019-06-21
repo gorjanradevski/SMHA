@@ -2,10 +2,9 @@ name: DEFLT
 joint_space: 512
 learning_rate: 0.0002
 margin: 0.5
-attn_size: 50
-attn_heads: 30
+attn_size: 128
+attn_heads: 20
 frob_norm_pen: 1.0
-gradient_clip_val: 5
+gor_pen: 1.0
+gradient_clip_val: 2
 seed: 42
-batch_hard: True
-use_gor: True

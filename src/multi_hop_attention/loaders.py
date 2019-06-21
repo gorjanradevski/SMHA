@@ -3,7 +3,7 @@ from typing import List, Tuple, Generator
 import logging
 from abc import ABC, abstractmethod
 
-from utils.constants import WIDTH, HEIGHT, NUM_CHANNELS, VGG_MEAN
+from utils.constants import WIDTH, HEIGHT, NUM_CHANNELS
 
 
 logging.basicConfig(level=logging.INFO)
@@ -22,8 +22,8 @@ class BaseLoader(ABC):
         # Adapted: https://gist.github.com/omoindrot/dedc857cdc0e680dfb1be99762990c9c
         image_string = tf.read_file(image_path)
         image = tf.image.decode_jpeg(image_string, channels=NUM_CHANNELS)
-        image = tf.cast(image, tf.float32)
-        smallest_side = 256.0  # Max for VGG19
+        image = tf.image.convert_image_dtype(image, tf.float32)
+        smallest_side = 256.0
         height, width = tf.shape(image)[0], tf.shape(image)[1]
         height = tf.cast(height, tf.float32)
         width = tf.cast(width, tf.float32)
@@ -48,8 +48,6 @@ class BaseLoader(ABC):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         image = tf.random_crop(image, [WIDTH, HEIGHT, NUM_CHANNELS])
         image = tf.image.random_flip_left_right(image)
-        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
-        image = image - means
 
         return image, caption, caption_len
 
@@ -58,8 +56,6 @@ class BaseLoader(ABC):
         image: tf.Tensor, caption: tf.Tensor, caption_len: tf.Tensor
     ):
         image = tf.image.resize_image_with_crop_or_pad(image, WIDTH, HEIGHT)
-        means = tf.reshape(tf.constant(VGG_MEAN), [1, 1, 3])
-        image = image - means
 
         return image, caption, caption_len
 

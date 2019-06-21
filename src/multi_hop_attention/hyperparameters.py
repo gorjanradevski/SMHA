@@ -44,12 +44,7 @@ class BaseHparamsFinder(ABC):
 
     # Abstract class from which all finders must inherit
     def __init__(
-        self,
-        batch_size: int,
-        prefetch_size: int,
-        imagenet_checkpoint_path: str,
-        epochs: int,
-        recall_at: int,
+        self, batch_size: int, prefetch_size: int, epochs: int, recall_at: int
     ):
         """Defines the search space and the general attributes.
 
@@ -61,7 +56,6 @@ class BaseHparamsFinder(ABC):
         """
         self.batch_size = batch_size
         self.prefetch_size = prefetch_size
-        self.imagenet_checkpoint_path = imagenet_checkpoint_path
         self.epochs = epochs
         self.recall_at = recall_at
         self.last_best = sys.maxsize
@@ -76,12 +70,11 @@ class BaseHparamsFinder(ABC):
                 "learning_rate", np.log(0.00001), np.log(0.01)
             ),
             "margin": hp.choice("margin", [0.02, 0.2, 0.4, 1.0, 3.0, 5.0]),
-            "attn_size": hp.choice("attn_size", [16, 32, 64]),
-            "attn_heads": hp.choice("attn_heads", [1, 5, 10, 20, 40]),
-            "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(1.0), np.log(5.0)),
-            "gradient_clip_val": hp.choice("gradient_clip_val", [1, 3, 5, 7, 9]),
-            "batch_hard": hp.choice("batch_hard", [True, False]),
-            "use_gor": hp.choice("use_gor", [True, False]),
+            "attn_size": hp.choice("attn_size", [64, 128, 256]),
+            "attn_heads": hp.choice("attn_heads", [5, 10, 20, 30]),
+            "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(0.5), np.log(3.0)),
+            "gradient_clip_val": hp.choice("gradient_clip_val", [1, 2, 3, 4]),
+            "gor_pen": hp.loguniform("gor_pen", np.log(0.5), np.log(3.0)),
         }
 
     @abstractmethod
@@ -154,7 +147,6 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         val_imgs_file_path: str,
         batch_size: int,
         prefetch_size: int,
-        imagenet_checkpoint_path: str,
         epochs: int,
         recall_at: int,
     ):
@@ -168,13 +160,10 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             val_imgs_file_path: File path to val images.
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
-            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
         """
-        super().__init__(
-            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
-        )
+        super().__init__(batch_size, prefetch_size, epochs, recall_at)
         self.images_path = images_path
         self.texts_path = texts_path
         self.train_imgs_file_path = train_imgs_file_path
@@ -188,8 +177,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         margin = args["margin"]
-        batch_hard = args["batch_hard"]
-        use_gor = args["use_gor"]
+        gor_pen = args["gor_pen"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_data(self.train_imgs_file_path)
@@ -222,13 +210,11 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             learning_rate,
             gradient_clip_val,
             decay_steps,
-            batch_hard,
-            use_gor,
         )
 
         with tf.Session() as sess:
             # Initialize model
-            model.init(sess, self.imagenet_checkpoint_path, imagenet_checkpoint=True)
+            model.init(sess)
             for e in range(self.epochs):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
@@ -239,7 +225,10 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                     while True:
                         _, loss = sess.run(
                             [model.optimize, model.loss],
-                            feed_dict={model.frob_norm_pen: frob_norm_pen},
+                            feed_dict={
+                                model.frob_norm_pen: frob_norm_pen,
+                                model.gor_pen: gor_pen,
+                            },
                         )
                 except tf.errors.OutOfRangeError:
                     pass
@@ -282,7 +271,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
         texts_path: str,
         batch_size: int,
         prefetch_size: int,
-        imagenet_checkpoint_path: str,
         epochs: int,
         recall_at: int,
     ):
@@ -294,14 +282,11 @@ class PascalHparamsFinder(BaseHparamsFinder):
             texts_path: The path to the captions.
             batch_size: The batch size that will be used to conduct the experiments.
             prefetch_size: The prefetching size when running on GPU.
-            imagenet_checkpoint_path: The checkpoint to the pretrained imagenet weights.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
 
         """
-        super().__init__(
-            batch_size, prefetch_size, imagenet_checkpoint_path, epochs, recall_at
-        )
+        super().__init__(batch_size, prefetch_size, epochs, recall_at)
         self.images_path = images_path
         self.texts_path = texts_path
 
@@ -313,8 +298,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         margin = args["margin"]
-        batch_hard = args["batch_hard"]
-        use_gor = args["use_gor"]
+        gor_pen = args["gor_pen"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_train_data()
@@ -348,12 +332,10 @@ class PascalHparamsFinder(BaseHparamsFinder):
             learning_rate,
             gradient_clip_val,
             decay_steps,
-            batch_hard,
-            use_gor,
         )
         with tf.Session() as sess:
             # Initialize model
-            model.init(sess, self.imagenet_checkpoint_path, imagenet_checkpoint=True)
+            model.init(sess)
             for e in range(self.epochs):
                 # Reset the evaluator
                 evaluator_val.reset_all_vars()
@@ -364,7 +346,10 @@ class PascalHparamsFinder(BaseHparamsFinder):
                     while True:
                         _, loss = sess.run(
                             [model.optimize, model.loss],
-                            feed_dict={model.frob_norm_pen: frob_norm_pen},
+                            feed_dict={
+                                model.frob_norm_pen: frob_norm_pen,
+                                model.gor_pen: gor_pen,
+                            },
                         )
                 except tf.errors.OutOfRangeError:
                     pass

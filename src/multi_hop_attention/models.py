@@ -1,7 +1,6 @@
 import tensorflow as tf
 import logging
 from typing import Tuple
-from tensorflow.contrib import slim
 import tensorflow_hub as hub
 
 logging.basicConfig(level=logging.INFO)
@@ -21,8 +20,6 @@ class MultiHopAttentionModel:
         learning_rate: float = 0.0,
         clip_value: int = 0,
         decay_steps: float = 0.0,
-        batch_hard: bool = False,
-        use_gor: bool = False,
         log_dir: str = "",
         name: str = "",
     ):
@@ -47,6 +44,7 @@ class MultiHopAttentionModel:
         self.frob_norm_pen = tf.placeholder_with_default(
             0.0, None, name="frob_norm_pen"
         )
+        self.gor_pen = tf.placeholder_with_default(0.0, None, name="gor_pen")
         # Build model
         self.image_encoded = self.image_encoder_graph(self.images, joint_space)
         logger.info("Image encoder graph created...")
@@ -62,15 +60,9 @@ class MultiHopAttentionModel:
             attn_size, attn_heads, self.text_encoded, "siamese_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(
-            margin, batch_hard, use_gor, attn_heads, joint_space
-        )
+        self.loss = self.compute_loss(margin, attn_heads, joint_space)
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
-        )
-        # ImageNet graph loader and graph saver/loader
-        self.image_encoder_loader = tf.train.Saver(
-            tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="vgg_19")
         )
         self.saver_loader = tf.train.Saver()
         logger.info("Graph creation finished...")
@@ -89,43 +81,20 @@ class MultiHopAttentionModel:
             The encoded image.
 
         """
-        # As per: https://arxiv.org/abs/1409.1556
-        with tf.variable_scope("vgg_19", "vgg_19", [images]) as sc:
-            end_points_collection = sc.original_name_scope + "_end_points"
-            # Collect outputs for conv2d and max_pool2d.
-            with slim.arg_scope(
-                [slim.conv2d, slim.max_pool2d],
-                outputs_collections=end_points_collection,
-            ):
-                net = slim.repeat(
-                    images, 2, slim.conv2d, 64, [3, 3], scope="conv1", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool1")
-                net = slim.repeat(
-                    net, 2, slim.conv2d, 128, [3, 3], scope="conv2", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool2")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 256, [3, 3], scope="conv3", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool3")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 512, [3, 3], scope="conv4", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool4")
-                net = slim.repeat(
-                    net, 4, slim.conv2d, 512, [3, 3], scope="conv5", trainable=False
-                )
-                net = slim.max_pool2d(net, [2, 2], scope="pool5")
-
         with tf.variable_scope("image_encoder"):
-            flatten = tf.reshape(net, (-1, net.shape[3]))
+            resnet = hub.Module(
+                "https://tfhub.dev/google/imagenet/resnet_v2_50/feature_vector/3"
+            )
+            features = resnet(images, signature="image_feature_vector", as_dict=True)[
+                "resnet_v2_50/block4/unit_3/bottleneck_v2/conv3"
+            ]
+            flatten = tf.reshape(features, (-1, features.shape[3]))
             project_layer = tf.layers.dense(
                 flatten, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
             )
 
             return tf.reshape(
-                project_layer, (-1, net.shape[1] * net.shape[2], joint_space)
+                project_layer, (-1, features.shape[1] * features.shape[2], joint_space)
             )
 
     @staticmethod
@@ -248,7 +217,7 @@ class MultiHopAttentionModel:
         )
 
     @staticmethod
-    def triplet_loss(scores: tf.Tensor, margin, batch_hard):
+    def triplet_loss(scores: tf.Tensor, margin):
         diagonal = tf.diag_part(scores)
         # Compare every diagonal score to scores in its column
         # All contrastive images for each sentence
@@ -260,12 +229,6 @@ class MultiHopAttentionModel:
         # Clear diagonals
         cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
         cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
-
-        if batch_hard:
-            # For each positive pair (i,s) pick the hardest contrastive image
-            cost_s = tf.reduce_max(cost_s, axis=1)
-            # For each positive pair (i,s) pick the hardest contrastive sentence
-            cost_im = tf.reduce_max(cost_im, axis=0)
 
         return tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
@@ -292,25 +255,19 @@ class MultiHopAttentionModel:
         return tf.pow(m1, 2) + tf.maximum(0.0, m2 - d)
 
     def compute_loss(
-        self,
-        margin: float,
-        batch_hard: bool,
-        use_gor: bool,
-        attn_heads: int,
-        joint_space: int,
+        self, margin: float, attn_heads: int, joint_space: int
     ) -> tf.Tensor:
         """Computes the final loss of the model.
 
-        1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612
+        1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612 (Batch all)
         2. Computes the Frob norm of the of the AA^T - I (image embeddings).
         3. Computes the Frob norm of the of the AA^T - I (text embeddings).
-        4. Adds all together to compute the loss.
+        4. Computes the GOR pen.
+        5. Adds all together to compute the loss.
 
         Args:
             margin: The contrastive margin.
             attn_heads: The number of attention heads.
-            batch_hard: Whether to train only on the hard negatives.
-            use_gor: Whether to compute the global orthogonal regularization.
             joint_space: The space where the encoded images and text are going to be
             projected to.
 
@@ -323,10 +280,9 @@ class MultiHopAttentionModel:
             scores = tf.matmul(
                 self.attended_images, self.attended_captions, transpose_b=True
             )
-            triplet_loss = self.triplet_loss(scores, margin, batch_hard)
-            gor = 0.0
-            if use_gor:
-                gor = self.gor(scores, attn_heads * joint_space)
+            triplet_loss = self.triplet_loss(scores, margin)
+
+            gor = self.gor(scores, attn_heads * joint_space) * self.gor_pen
 
             pen_image_alphas = (
                 self.compute_frob_norm(self.image_alphas, attn_heads)
@@ -371,25 +327,19 @@ class MultiHopAttentionModel:
                 zip(gradients, variables), global_step=self.global_step
             )
 
-    def init(
-        self, sess: tf.Session, checkpoint_path, imagenet_checkpoint: bool
-    ) -> None:
+    def init(self, sess: tf.Session, checkpoint_path: str = None) -> None:
         """Initializes all variables in the graph.
 
         Args:
             sess: The active session.
             checkpoint_path: Path to a valid checkpoint.
-            imagenet_checkpoint: Whether the checkpoint points to a model pretrained on
-            imagenet or a full model.
 
         Returns:
             None
 
         """
-        sess.run(tf.global_variables_initializer())
-        if imagenet_checkpoint:
-            self.image_encoder_loader.restore(sess, checkpoint_path)
-        else:
+        sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
+        if checkpoint_path is not None:
             self.saver_loader.restore(sess, checkpoint_path)
 
     def add_summary_graph(self, sess: tf.Session) -> None:

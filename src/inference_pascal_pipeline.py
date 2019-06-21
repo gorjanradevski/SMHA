@@ -79,7 +79,7 @@ def inference(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path, imagenet_checkpoint=False)
+        model.init(sess, checkpoint_path)
         try:
             with tqdm(total=len(test_image_paths)) as pbar:
                 while True:
@@ -147,15 +147,7 @@ def parse_args():
         help="Path where the captions are.",
     )
     parser.add_argument(
-        "--checkpoint_path",
-        type=str,
-        default="models/image_encoders/vgg_19.ckpt",
-        help="Path to a model checkpoint.",
-    )
-    parser.add_argument(
-        "--imagenet_checkpoint",
-        action="store_true",
-        help="If the checkpoint is an imagenet checkpoint.",
+        "--checkpoint_path", type=str, default=None, help="Path to a model checkpoint."
     )
     parser.add_argument(
         "--batch_size", type=int, default=64, help="The size of the batch."
