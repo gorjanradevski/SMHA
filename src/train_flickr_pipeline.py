@@ -142,7 +142,7 @@ def train(
                             [model.optimize, model.loss, model.captions_len],
                             feed_dict={
                                 model.frob_norm_pen: hparams.frob_norm_pen,
-                                model.gor_pen: gor_pen,
+                                model.gor_pen: hparams.gor_pen,
                             },
                         )
                         evaluator_train.update_metrics(loss)
