@@ -66,6 +66,7 @@ class BaseHparamsFinder(ABC):
         # Define the search space
         self.search_space = {
             "joint_space": hp.choice("joint_space", [256, 512, 1024]),
+            "num_layers": hp.choice("num_layers", [1, 2, 3]),
             "learning_rate": hp.loguniform(
                 "learning_rate", np.log(0.00001), np.log(0.01)
             ),
@@ -73,8 +74,9 @@ class BaseHparamsFinder(ABC):
             "attn_size": hp.choice("attn_size", [64, 128, 256]),
             "attn_heads": hp.choice("attn_heads", [5, 10, 20, 30]),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(0.5), np.log(3.0)),
-            "gradient_clip_val": hp.choice("gradient_clip_val", [1, 2, 3, 4]),
+            "gradient_clip_val": hp.choice("gradient_clip_val", [1, 2, 3, 4, 5]),
             "gor_pen": hp.loguniform("gor_pen", np.log(0.5), np.log(3.0)),
+            "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9]),
         }
 
     @abstractmethod
@@ -171,6 +173,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
 
     def objective(self, args: Dict[str, Any]):
         joint_space = args["joint_space"]
+        num_layers = args["num_layers"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
@@ -178,6 +181,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         gradient_clip_val = args["gradient_clip_val"]
         margin = args["margin"]
         gor_pen = args["gor_pen"]
+        keep_prob = args["keep_prob"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_data(self.train_imgs_file_path)
@@ -205,6 +209,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             captions_lengths,
             margin,
             joint_space,
+            num_layers,
             attn_size,
             attn_heads,
             learning_rate,
@@ -228,6 +233,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                             feed_dict={
                                 model.frob_norm_pen: frob_norm_pen,
                                 model.gor_pen: gor_pen,
+                                model.keep_prob: keep_prob,
                             },
                         )
                 except tf.errors.OutOfRangeError:
@@ -292,6 +298,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
 
     def objective(self, args: Dict[str, Any]):
         joint_space = args["joint_space"]
+        num_layers = args["num_layers"]
         attn_size = args["attn_size"]
         attn_heads = args["attn_heads"]
         frob_norm_pen = args["frob_norm_pen"]
@@ -299,6 +306,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         gradient_clip_val = args["gradient_clip_val"]
         margin = args["margin"]
         gor_pen = args["gor_pen"]
+        keep_prob = args["keep_prob"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_train_data()
@@ -327,6 +335,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
             captions_lengths,
             margin,
             joint_space,
+            num_layers,
             attn_size,
             attn_heads,
             learning_rate,
@@ -349,6 +358,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
                             feed_dict={
                                 model.frob_norm_pen: frob_norm_pen,
                                 model.gor_pen: gor_pen,
+                                model.keep_prob: keep_prob,
                             },
                         )
                 except tf.errors.OutOfRangeError:

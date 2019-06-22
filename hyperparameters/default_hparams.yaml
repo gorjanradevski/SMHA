@@ -8,3 +8,5 @@ frob_norm_pen: 1.0
 gor_pen: 1.0
 gradient_clip_val: 2
 seed: 42
+num_layers: 1
+keep_prob: 1.0

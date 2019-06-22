@@ -70,6 +70,7 @@ def inference(
         captions_lengths,
         hparams.margin,
         hparams.joint_space,
+        hparams.num_layers,
         hparams.attn_size,
         hparams.attn_heads,
     )

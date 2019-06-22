@@ -79,13 +79,18 @@ def frob_norm_pen():
 
 
 @pytest.fixture
-def batch_hard():
-    return True
+def decay_epochs():
+    return 2
 
 
 @pytest.fixture
-def decay_epochs():
-    return 2
+def num_layers():
+    return 1
+
+
+@pytest.fixture
+def keep_prob():
+    return 0.5
 
 
 def test_image_encoder(input_images_image_encoder, joint_space):
@@ -95,7 +100,7 @@ def test_image_encoder(input_images_image_encoder, joint_space):
         image_inputs_layer, joint_space
     )
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
         output_shape = sess.run(
             image_encoded, feed_dict={image_inputs_layer: input_images_image_encoder}
         ).shape
@@ -110,7 +115,7 @@ def test_image_encoder_batch_size_invariance(input_images_image_encoder, joint_s
         image_inputs_layer, joint_space
     )
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
         output_5 = sess.run(
             image_encoded,
             feed_dict={image_inputs_layer: input_images_image_encoder[:5]},
@@ -122,13 +127,13 @@ def test_image_encoder_batch_size_invariance(input_images_image_encoder, joint_s
         np.testing.assert_almost_equal(output_50[:5], output_5, decimal=3)
 
 
-def test_text_encoder(captions, captions_len, joint_space):
+def test_text_encoder(captions, captions_len, joint_space, num_layers, keep_prob):
     tf.reset_default_graph()
     text_encoded = MultiHopAttentionModel.text_encoder_graph(
-        captions, captions_len, joint_space
+        captions, captions_len, joint_space, num_layers, keep_prob
     )
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
         outputs = sess.run(text_encoded).shape
     assert outputs[0] == 3
     assert outputs[1] == 5
@@ -143,7 +148,7 @@ def test_joint_attention(attn_size, attn_heads, encoded_input):
         attn_size, attn_heads, input_layer, "siamese_attention"
     )
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
         attended_input, alphas = sess.run(
             attention, feed_dict={input_layer: encoded_input}
         )
@@ -160,15 +165,22 @@ def test_attended_image_text_shape(
     captions_len,
     margin,
     joint_space,
+    num_layers,
     attn_size,
     attn_heads,
     learning_rate,
     clip_value,
-    batch_hard,
 ):
     tf.reset_default_graph()
     model = MultiHopAttentionModel(
-        input_images, captions, captions_len, margin, joint_space, attn_size, attn_heads
+        input_images,
+        captions,
+        captions_len,
+        margin,
+        joint_space,
+        num_layers,
+        attn_size,
+        attn_heads,
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]

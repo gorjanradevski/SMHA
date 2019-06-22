@@ -15,6 +15,7 @@ class MultiHopAttentionModel:
         captions_len: tf.Tensor,
         margin: int,
         joint_space: int,
+        num_layers: int,
         attn_size: int,
         attn_heads: int,
         learning_rate: float = 0.0,
@@ -45,11 +46,12 @@ class MultiHopAttentionModel:
             0.0, None, name="frob_norm_pen"
         )
         self.gor_pen = tf.placeholder_with_default(0.0, None, name="gor_pen")
+        self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
         # Build model
         self.image_encoded = self.image_encoder_graph(self.images, joint_space)
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(
-            self.captions, self.captions_len, joint_space
+            self.captions, self.captions_len, joint_space, num_layers, self.keep_prob
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.attention_graph(
@@ -99,7 +101,11 @@ class MultiHopAttentionModel:
 
     @staticmethod
     def text_encoder_graph(
-        captions: tf.Tensor, captions_len: tf.Tensor, joint_space: int
+        captions: tf.Tensor,
+        captions_len: tf.Tensor,
+        joint_space: int,
+        num_layers: int,
+        keep_prob: float,
     ):
         """Encodes the text it gets as input using a bidirectional rnn.
 
@@ -108,6 +114,8 @@ class MultiHopAttentionModel:
             captions_len: The length of the inputs.
             joint_space: The space where the encoded images and text are going to be
             projected to.
+            num_layers: The number of layers in the Bi-RNN.
+            keep_prob: The inverse dropout probability.
 
         Returns:
             The encoded text.
@@ -120,11 +128,31 @@ class MultiHopAttentionModel:
                 signature="tokens",
                 as_dict=True,
             )["elmo"]
-            flatten = tf.reshape(embeddings, (-1, embeddings.shape[2]))
-            project_layer = tf.layers.dense(
-                flatten, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
+            cell_fw = tf.nn.rnn_cell.MultiRNNCell(
+                [
+                    tf.nn.rnn_cell.DropoutWrapper(
+                        tf.nn.rnn_cell.GRUCell(joint_space), output_keep_prob=keep_prob
+                    )
+                    for _ in range(num_layers)
+                ]
             )
-            return tf.reshape(project_layer, (-1, tf.shape(embeddings)[1], joint_space))
+            cell_bw = tf.nn.rnn_cell.MultiRNNCell(
+                [
+                    tf.nn.rnn_cell.DropoutWrapper(
+                        tf.nn.rnn_cell.GRUCell(joint_space), output_keep_prob=keep_prob
+                    )
+                    for _ in range(num_layers)
+                ]
+            )
+            (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
+                cell_fw,
+                cell_bw,
+                embeddings,
+                sequence_length=captions_len,
+                dtype=tf.float32,
+            )
+
+            return tf.add(output_fw, output_bw) / 2
 
     @staticmethod
     def attention_graph(

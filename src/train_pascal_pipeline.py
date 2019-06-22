@@ -107,6 +107,7 @@ def train(
         captions_lengths,
         hparams.margin,
         hparams.joint_space,
+        hparams.num_layers,
         hparams.attn_size,
         hparams.attn_heads,
         hparams.learning_rate,
@@ -139,6 +140,7 @@ def train(
                             feed_dict={
                                 model.frob_norm_pen: hparams.frob_norm_pen,
                                 model.gor_pen: hparams.gor_pen,
+                                model.keep_prob: hparams.keep_prob,
                             },
                         )
                         evaluator_train.update_metrics(loss)
