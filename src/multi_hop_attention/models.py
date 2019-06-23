@@ -47,6 +47,7 @@ class MultiHopAttentionModel:
         )
         self.gor_pen = tf.placeholder_with_default(0.0, None, name="gor_pen")
         self.keep_prob = tf.placeholder_with_default(1.0, None, name="keep_prob")
+        self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
         # Build model
         self.image_encoded = self.image_encoder_graph(self.images, joint_space)
         logger.info("Image encoder graph created...")
@@ -55,11 +56,11 @@ class MultiHopAttentionModel:
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.attention_graph(
-            attn_size, attn_heads, self.image_encoded, "siamese_attention"
+            attn_size, attn_heads, self.image_encoded, "image_attention"
         )
         # Reusing the same variables that were used for the images
         self.attended_captions, self.text_alphas = self.attention_graph(
-            attn_size, attn_heads, self.text_encoded, "siamese_attention"
+            attn_size, attn_heads, self.text_encoded, "text_attention"
         )
         logger.info("Attention graph created...")
         self.loss = self.compute_loss(margin, attn_heads, joint_space)
@@ -85,10 +86,10 @@ class MultiHopAttentionModel:
         """
         with tf.variable_scope("image_encoder"):
             resnet = hub.Module(
-                "https://tfhub.dev/google/imagenet/resnet_v2_50/feature_vector/3"
+                "https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/3"
             )
             features = resnet(images, signature="image_feature_vector", as_dict=True)[
-                "resnet_v2_50/block4/unit_3/bottleneck_v2/conv3"
+                "resnet_v2_152/block4"
             ]
             flatten = tf.reshape(features, (-1, features.shape[3]))
             project_layer = tf.layers.dense(
@@ -131,7 +132,11 @@ class MultiHopAttentionModel:
             cell_fw = tf.nn.rnn_cell.MultiRNNCell(
                 [
                     tf.nn.rnn_cell.DropoutWrapper(
-                        tf.nn.rnn_cell.GRUCell(joint_space), output_keep_prob=keep_prob
+                        tf.nn.rnn_cell.GRUCell(joint_space),
+                        state_keep_prob=keep_prob,
+                        input_size=(tf.shape(embeddings)[0], joint_space),
+                        variational_recurrent=True,
+                        dtype=tf.float32,
                     )
                     for _ in range(num_layers)
                 ]
@@ -139,7 +144,11 @@ class MultiHopAttentionModel:
             cell_bw = tf.nn.rnn_cell.MultiRNNCell(
                 [
                     tf.nn.rnn_cell.DropoutWrapper(
-                        tf.nn.rnn_cell.GRUCell(joint_space), output_keep_prob=keep_prob
+                        tf.nn.rnn_cell.GRUCell(joint_space),
+                        state_keep_prob=keep_prob,
+                        input_size=(tf.shape(embeddings)[0], joint_space),
+                        variational_recurrent=True,
+                        dtype=tf.float32,
                     )
                     for _ in range(num_layers)
                 ]
@@ -291,7 +300,8 @@ class MultiHopAttentionModel:
         2. Computes the Frob norm of the of the AA^T - I (image embeddings).
         3. Computes the Frob norm of the of the AA^T - I (text embeddings).
         4. Computes the GOR pen.
-        5. Adds all together to compute the loss.
+        5. Computes the L2 loss.
+        6. Adds all together to compute the loss.
 
         Args:
             margin: The contrastive margin.
@@ -321,7 +331,18 @@ class MultiHopAttentionModel:
                 * self.frob_norm_pen
             )
 
-            return triplet_loss + gor + pen_image_alphas + pen_text_alphas
+            l2_loss = (
+                tf.add_n(
+                    [
+                        tf.nn.l2_loss(v)
+                        for v in tf.trainable_variables()
+                        if "bias" not in v.name
+                    ]
+                )
+                * self.weight_decay
+            )
+
+            return triplet_loss + gor + pen_image_alphas + pen_text_alphas + l2_loss
 
     def apply_gradients_op(
         self, loss: tf.Tensor, learning_rate: float, clip_value: int, decay_steps: float

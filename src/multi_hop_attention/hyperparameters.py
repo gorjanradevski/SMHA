@@ -74,9 +74,12 @@ class BaseHparamsFinder(ABC):
             "attn_size": hp.choice("attn_size", [64, 128, 256]),
             "attn_heads": hp.choice("attn_heads", [5, 10, 20, 30]),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(0.5), np.log(3.0)),
-            "gradient_clip_val": hp.choice("gradient_clip_val", [1, 2, 3, 4, 5]),
+            "gradient_clip_val": hp.choice("gradient_clip_val", [1, 3, 5, 7]),
             "gor_pen": hp.loguniform("gor_pen", np.log(0.5), np.log(3.0)),
-            "keep_prob": hp.choice("keep_prob", [0.5, 0.6, 0.7, 0.8, 0.9]),
+            "keep_prob": hp.choice("keep_prob", [0.7, 0.8, 0.9, 1.0]),
+            "weight_decay": hp.loguniform(
+                "weight_decay", np.log(0.00001), np.log(0.01)
+            ),
         }
 
     @abstractmethod
@@ -182,6 +185,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         margin = args["margin"]
         gor_pen = args["gor_pen"]
         keep_prob = args["keep_prob"]
+        weight_decay = args["weight_decay"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_data(self.train_imgs_file_path)
@@ -234,6 +238,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                                 model.frob_norm_pen: frob_norm_pen,
                                 model.gor_pen: gor_pen,
                                 model.keep_prob: keep_prob,
+                                model.weight_decay: weight_decay,
                             },
                         )
                 except tf.errors.OutOfRangeError:
@@ -307,6 +312,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         margin = args["margin"]
         gor_pen = args["gor_pen"]
         keep_prob = args["keep_prob"]
+        weight_decay = args["weight_decay"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_train_data()
@@ -359,6 +365,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
                                 model.frob_norm_pen: frob_norm_pen,
                                 model.gor_pen: gor_pen,
                                 model.keep_prob: keep_prob,
+                                model.weight_decay: weight_decay,
                             },
                         )
                 except tf.errors.OutOfRangeError:

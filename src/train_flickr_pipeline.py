@@ -39,6 +39,7 @@ def train(
     frob_norm_pen: float = None,
     attn_heads: int = None,
     gor_pen: float = None,
+    weight_decay: float = None,
 ) -> None:
     """Starts a training session with the Flickr8k dataset.
 
@@ -59,6 +60,7 @@ def train(
         frob_norm_pen: If provided update the one in hparams.
         attn_heads: If provided update the one in hparams.
         gor_pen: If provided update the one in hparams.
+        weight_decay: If provided update the one in hparams.
 
     Returns:
         None
@@ -76,6 +78,8 @@ def train(
         hparams.set_hparam("attn_heads", attn_heads)
     if gor_pen is not None:
         hparams.set_hparam("gor_pen", gor_pen)
+    if weight_decay is not None:
+        hparams.set_hparam("weight_decay", weight_decay)
     dataset = FlickrDataset(images_path, texts_path)
     train_image_paths, train_captions = dataset.get_data(train_imgs_file_path)
     val_image_paths, val_captions = dataset.get_data(val_imgs_file_path)
@@ -145,6 +149,7 @@ def train(
                                 model.frob_norm_pen: hparams.frob_norm_pen,
                                 model.gor_pen: hparams.gor_pen,
                                 model.keep_prob: hparams.keep_prob,
+                                model.weight_decay: hparams.weight_decay,
                             },
                         )
                         evaluator_train.update_metrics(loss)
@@ -322,7 +327,12 @@ def parse_args():
         default=None,
         help="This will override the hparams gor penalization rate.",
     )
-
+    parser.add_argument(
+        "--weight_decay",
+        type=float,
+        default=None,
+        help="This will override the hparams weight_decay penalization rate.",
+    )
     return parser.parse_args()
 
 
