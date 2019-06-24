@@ -17,7 +17,6 @@ from utils.datasets import FlickrDataset, PascalSentencesDataset
 from multi_hop_attention.models import MultiHopAttentionModel
 from multi_hop_attention.loaders import TrainValLoader
 from utils.evaluators import Evaluator
-from utils.constants import decay_rate_epochs
 
 logging.getLogger("utils.datasets").setLevel(logging.ERROR)
 logging.getLogger("multi_hop_attention.models").setLevel(logging.ERROR)
@@ -44,7 +43,12 @@ class BaseHparamsFinder(ABC):
 
     # Abstract class from which all finders must inherit
     def __init__(
-        self, batch_size: int, prefetch_size: int, epochs: int, recall_at: int
+        self,
+        batch_size: int,
+        prefetch_size: int,
+        epochs: int,
+        recall_at: int,
+        decay_rate_epochs: int,
     ):
         """Defines the search space and the general attributes.
 
@@ -53,10 +57,12 @@ class BaseHparamsFinder(ABC):
             prefetch_size: The prefetching size when running on GPU.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
+            decay_rate_epochs: When to decay the learning rate.
         """
         self.batch_size = batch_size
         self.prefetch_size = prefetch_size
         self.epochs = epochs
+        self.decay_rate_epochs = decay_rate_epochs
         self.recall_at = recall_at
         self.last_best = sys.maxsize
         # Set seed value for all experiments in the current iteration
@@ -153,6 +159,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         batch_size: int,
         prefetch_size: int,
         epochs: int,
+        decay_rate_epochs: int,
         recall_at: int,
     ):
         """Creates a finder that will find the best hyperparameters for the Flickr
@@ -167,8 +174,11 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             prefetch_size: The prefetching size when running on GPU.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
+            decay_rate_epochs: When to decay the learning rate.
         """
-        super().__init__(batch_size, prefetch_size, epochs, recall_at)
+        super().__init__(
+            batch_size, prefetch_size, epochs, recall_at, decay_rate_epochs
+        )
         self.images_path = images_path
         self.texts_path = texts_path
         self.train_imgs_file_path = train_imgs_file_path
@@ -206,7 +216,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         )
         images, captions, captions_lengths = loader.get_next()
 
-        decay_steps = decay_rate_epochs * len(train_image_paths) / self.batch_size
+        decay_steps = self.decay_rate_epochs * len(train_image_paths) / self.batch_size
         model = MultiHopAttentionModel(
             images,
             captions,
@@ -283,6 +293,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         batch_size: int,
         prefetch_size: int,
         epochs: int,
+        decay_rate_epochs: int,
         recall_at: int,
     ):
         """Creates a finder that will find the best hyperparameters for the Pascal
@@ -295,9 +306,12 @@ class PascalHparamsFinder(BaseHparamsFinder):
             prefetch_size: The prefetching size when running on GPU.
             epochs: The number of epochs per experiment.
             recall_at: The recall at K.
+            decay_rate_epochs: When to decay the learning rate.
 
         """
-        super().__init__(batch_size, prefetch_size, epochs, recall_at)
+        super().__init__(
+            batch_size, prefetch_size, epochs, recall_at, decay_rate_epochs
+        )
         self.images_path = images_path
         self.texts_path = texts_path
 
@@ -334,7 +348,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         )
         images, captions, captions_lengths = loader.get_next()
 
-        decay_steps = decay_rate_epochs * len(train_image_paths) / self.batch_size
+        decay_steps = self.decay_rate_epochs * len(train_image_paths) / self.batch_size
         model = MultiHopAttentionModel(
             images,
             captions,

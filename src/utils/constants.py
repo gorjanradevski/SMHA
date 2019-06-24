@@ -9,6 +9,3 @@ pascal_val_size = 0.1
 
 # Metrics
 inference_for_recall_at = [1, 5, 10]
-
-# Model specifics
-decay_rate_epochs = 4

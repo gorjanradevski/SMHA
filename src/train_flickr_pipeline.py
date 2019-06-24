@@ -10,7 +10,6 @@ from multi_hop_attention.hyperparameters import YParams
 from multi_hop_attention.loaders import TrainValLoader
 from multi_hop_attention.models import MultiHopAttentionModel
 from utils.evaluators import Evaluator
-from utils.constants import decay_rate_epochs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,6 +34,7 @@ def train(
     checkpoint_path: str,
     save_model_path: str,
     log_model_path: str,
+    decay_rate_epochs: int,
     learning_rate: float = None,
     frob_norm_pen: float = None,
     attn_heads: int = None,
@@ -61,6 +61,7 @@ def train(
         attn_heads: If provided update the one in hparams.
         gor_pen: If provided update the one in hparams.
         weight_decay: If provided update the one in hparams.
+        decay_rate_epochs: When to decay the learning rate.
 
     Returns:
         None
@@ -225,6 +226,7 @@ def main():
         args.checkpoint_path,
         args.save_model_path,
         args.log_model_path,
+        args.decay_rate_epochs,
         args.learning_rate,
         args.frob_norm_pen,
         args.attn_heads,
@@ -331,6 +333,12 @@ def parse_args():
         "--weight_decay",
         type=float,
         default=None,
+        help="This will override the hparams weight_decay penalization rate.",
+    )
+    parser.add_argument(
+        "--decay_rate_epochs",
+        type=int,
+        default=4,
         help="This will override the hparams weight_decay penalization rate.",
     )
     return parser.parse_args()
