@@ -17,6 +17,7 @@ class TransformerResnet:
         learning_rate: float = 0.0,
         clip_value: int = 0,
         decay_steps: float = 0.0,
+        batch_hard: bool = False,
         log_dir: str = "",
         name: str = "",
     ):
@@ -39,12 +40,17 @@ class TransformerResnet:
         # Create dropout and weight decay placeholder
         self.gor_pen = tf.placeholder_with_default(0.0, None, name="gor_pen")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
+        self.dropout = tf.placeholder_with_default(1.0, None, name="dropout")
         # Build model
-        self.image_encoded = self.image_encoder_graph(self.images, joint_space)
+        self.image_encoded = self.image_encoder_graph(
+            self.images, joint_space, self.dropout
+        )
         logger.info("Image encoder graph created...")
-        self.text_encoded = self.text_encoder_graph(self.captions, joint_space)
+        self.text_encoded = self.text_encoder_graph(
+            self.captions, joint_space, self.dropout
+        )
         logger.info("Text encoder graph created...")
-        self.loss = self.compute_loss(margin, joint_space)
+        self.loss = self.compute_loss(margin, joint_space, batch_hard)
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
         )
@@ -52,14 +58,17 @@ class TransformerResnet:
         logger.info("Graph creation finished...")
 
     @staticmethod
-    def image_encoder_graph(images: tf.Tensor, joint_space: int) -> tf.Tensor:
-        """Extract higher level features from the image using a conv vgg19 pretrained on
-        Image net.
+    def image_encoder_graph(
+        images: tf.Tensor, joint_space: int, dropout: float
+    ) -> tf.Tensor:
+        """Extract higher level features from the image using a resnet152 pretrained on
+        ImageNet.
 
         Args:
             images: The input images.
             joint_space: The space where the encoded images and text are going to be
             projected to.
+            dropout: The dropout rate.
 
         Returns:
             The encoded image.
@@ -69,25 +78,29 @@ class TransformerResnet:
             resnet = hub.Module(
                 "https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/3"
             )
-            embeddings = resnet(images, signature="image_feature_vector", as_dict=True)[
-                "default"
-            ]
-            project_layer = tf.layers.dense(
+            embeddings = resnet(images)
+            linear1 = tf.layers.dense(
                 embeddings,
                 joint_space,
-                kernel_initializer=tf.glorot_uniform_initializer(),
+                kernel_initializer=tf.variance_scaling_initializer(),
+                activation=tf.nn.relu,
+            )
+            dropout = tf.layers.dropout(linear1, rate=dropout)
+            linear2 = tf.layers.dense(
+                dropout, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
             )
 
-            return project_layer
+            return linear2
 
     @staticmethod
-    def text_encoder_graph(captions: tf.Tensor, joint_space: int):
+    def text_encoder_graph(captions: tf.Tensor, joint_space: int, dropout: float):
         """Encodes the text it gets as input using a bidirectional rnn.
 
         Args:
             captions: The inputs.
             joint_space: The space where the encoded images and text are going to be
             projected to.
+            dropout: The dropout rate.
 
         Returns:
             The encoded text.
@@ -98,27 +111,40 @@ class TransformerResnet:
                 "https://tfhub.dev/google/universal-sentence-encoder-large/3"
             )
             embeddings = transformer(captions)
-            project_layer = tf.layers.dense(
+            linear1 = tf.layers.dense(
                 embeddings,
                 joint_space,
-                kernel_initializer=tf.glorot_uniform_initializer(),
+                kernel_initializer=tf.variance_scaling_initializer(),
+                activation=tf.nn.relu,
+            )
+            dropout = tf.layers.dropout(linear1, rate=dropout)
+            linear2 = tf.layers.dense(
+                dropout, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
             )
 
-            return project_layer
+            return linear2
 
     @staticmethod
-    def triplet_loss(scores: tf.Tensor, margin):
+    def triplet_loss(scores: tf.Tensor, margin: float, batch_hard: bool = False):
         diagonal = tf.diag_part(scores)
         # Compare every diagonal score to scores in its column
         # All contrastive images for each sentence
+        # noinspection PyTypeChecker
         cost_s = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
         # Compare every diagonal score to scores in its row
         # All contrastive sentences for each image
+        # noinspection PyTypeChecker
         cost_im = tf.maximum(0.0, margin - diagonal + scores)
 
         # Clear diagonals
         cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
         cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
+
+        if batch_hard:
+            # For each positive pair (i,s) pick the hardest contrastive image
+            cost_s = tf.reduce_max(cost_s, axis=1)
+            # For each positive pair (i,s) pick the hardest contrastive sentence
+            cost_im = tf.reduce_max(cost_im, axis=0)
 
         return tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
@@ -144,10 +170,12 @@ class TransformerResnet:
 
         return tf.pow(m1, 2) + tf.maximum(0.0, m2 - d)
 
-    def compute_loss(self, margin: float, joint_space: int) -> tf.Tensor:
+    def compute_loss(
+        self, margin: float, joint_space: int, batch_hard: bool = False
+    ) -> tf.Tensor:
         """Computes the final loss of the model.
 
-        1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612 (Batch all)
+        1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612
         2. Computes the GOR pen.
         3. Computes the L2 loss.
         4. Adds all together to compute the loss.
@@ -156,7 +184,7 @@ class TransformerResnet:
             margin: The contrastive margin.
             joint_space: The space where the encoded images and text are going to be
             projected to.
-
+            batch_hard: Whether to train only on the hard negatives.
 
         Returns:
             The final loss to be optimized.
@@ -164,7 +192,7 @@ class TransformerResnet:
         """
         with tf.variable_scope(name_or_scope="loss"):
             scores = tf.matmul(self.image_encoded, self.text_encoded, transpose_b=True)
-            triplet_loss = self.triplet_loss(scores, margin)
+            triplet_loss = self.triplet_loss(scores, margin, batch_hard)
 
             gor = self.gor(scores, joint_space) * self.gor_pen
 

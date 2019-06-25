@@ -13,7 +13,7 @@ class MultiHopAttentionModel:
         images: tf.Tensor,
         captions: tf.Tensor,
         captions_len: tf.Tensor,
-        margin: int,
+        margin: float,
         joint_space: int,
         num_layers: int,
         attn_size: int,
@@ -21,6 +21,7 @@ class MultiHopAttentionModel:
         learning_rate: float = 0.0,
         clip_value: int = 0,
         decay_steps: float = 0.0,
+        batch_hard: bool = False,
         log_dir: str = "",
         name: str = "",
     ):
@@ -63,7 +64,7 @@ class MultiHopAttentionModel:
             attn_size, attn_heads, self.text_encoded, "text_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_heads, joint_space)
+        self.loss = self.compute_loss(margin, attn_heads, joint_space, batch_hard)
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
         )
@@ -72,8 +73,8 @@ class MultiHopAttentionModel:
 
     @staticmethod
     def image_encoder_graph(images: tf.Tensor, joint_space: int) -> tf.Tensor:
-        """Extract higher level features from the image using a conv vgg19 pretrained on
-        Image net.
+        """Extract higher level features from the image using a resnet152 pretrained on
+        ImageNet.
 
         Args:
             images: The input images.
@@ -254,18 +255,26 @@ class MultiHopAttentionModel:
         )
 
     @staticmethod
-    def triplet_loss(scores: tf.Tensor, margin):
+    def triplet_loss(scores: tf.Tensor, margin: float, batch_hard: bool = False):
         diagonal = tf.diag_part(scores)
         # Compare every diagonal score to scores in its column
         # All contrastive images for each sentence
+        # noinspection PyTypeChecker
         cost_s = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
         # Compare every diagonal score to scores in its row
         # All contrastive sentences for each image
+        # noinspection PyTypeChecker
         cost_im = tf.maximum(0.0, margin - diagonal + scores)
 
         # Clear diagonals
         cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
         cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
+
+        if batch_hard:
+            # For each positive pair (i,s) pick the hardest contrastive image
+            cost_s = tf.reduce_max(cost_s, axis=1)
+            # For each positive pair (i,s) pick the hardest contrastive sentence
+            cost_im = tf.reduce_max(cost_im, axis=0)
 
         return tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
@@ -292,7 +301,7 @@ class MultiHopAttentionModel:
         return tf.pow(m1, 2) + tf.maximum(0.0, m2 - d)
 
     def compute_loss(
-        self, margin: float, attn_heads: int, joint_space: int
+        self, margin: float, attn_heads: int, joint_space: int, batch_hard: bool = False
     ) -> tf.Tensor:
         """Computes the final loss of the model.
 
@@ -308,6 +317,7 @@ class MultiHopAttentionModel:
             attn_heads: The number of attention heads.
             joint_space: The space where the encoded images and text are going to be
             projected to.
+            batch_hard: Whether to train only on the hard negatives.
 
 
         Returns:
@@ -318,7 +328,7 @@ class MultiHopAttentionModel:
             scores = tf.matmul(
                 self.attended_images, self.attended_captions, transpose_b=True
             )
-            triplet_loss = self.triplet_loss(scores, margin)
+            triplet_loss = self.triplet_loss(scores, margin, batch_hard)
 
             gor = self.gor(scores, attn_heads * joint_space) * self.gor_pen
 

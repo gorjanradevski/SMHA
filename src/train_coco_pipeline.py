@@ -40,6 +40,7 @@ def train(
     attn_heads: int = None,
     gor_pen: float = None,
     weight_decay: float = None,
+    batch_hard: bool = False,
 ) -> None:
     """Starts a training session.
 
@@ -62,6 +63,7 @@ def train(
         gor_pen: If provided update the one in hparams.
         weight_decay: If provided update the one in hparams.
         decay_rate_epochs: When to decay the learning rate.
+        batch_hard: Whether to train only on the hard negatives.
 
     Returns:
         None
@@ -124,6 +126,7 @@ def train(
         hparams.learning_rate,
         hparams.gradient_clip_val,
         decay_steps,
+        batch_hard,
         log_model_path,
         hparams.name,
     )
@@ -234,6 +237,7 @@ def main():
         args.attn_heads,
         args.gor_pen,
         args.weight_decay,
+        args.batch_hard,
     )
 
 
@@ -342,6 +346,12 @@ def parse_args():
         type=int,
         default=4,
         help="When to decay the learning rate.",
+    )
+    parser.add_argument(
+        "--batch_hard",
+        type=bool,
+        default=False,
+        help="Whether to train only on the hard negatives.",
     )
     return parser.parse_args()
 

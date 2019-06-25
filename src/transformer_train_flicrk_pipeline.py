@@ -35,10 +35,12 @@ def train(
     learning_rate: float,
     gor_pen: float,
     weight_decay: float,
+    dropout: float,
     joint_space: int,
     margin: float,
     gradient_clip_val: int,
     decay_rate_epochs: int,
+    batch_hard: bool,
 ) -> None:
     """Starts a training session with the Flickr8k dataset.
 
@@ -57,10 +59,12 @@ def train(
         learning_rate: The learning rate.
         gor_pen: The global orthogonal regularization rate.
         weight_decay: The L2 loss constant.
+        dropout: The dropout rate.
         joint_space: The space where the encoded images and text will be projected
         margin: The contrastive margin.
         gradient_clip_val: The max grad norm.
         decay_rate_epochs: When to decay the learning rate.
+        batch_hard: Whether to train only on the hard negatives.
 
     Returns:
         None
@@ -100,6 +104,7 @@ def train(
         learning_rate,
         gradient_clip_val,
         decay_steps,
+        batch_hard,
         log_model_path,
         "TRANS",
     )
@@ -127,6 +132,7 @@ def train(
                             feed_dict={
                                 model.gor_pen: gor_pen,
                                 model.weight_decay: weight_decay,
+                                model.dropout: dropout,
                             },
                         )
                         evaluator_train.update_metrics(loss)
@@ -204,10 +210,12 @@ def main():
         args.learning_rate,
         args.gor_pen,
         args.weight_decay,
+        args.dropout,
         args.joint_space,
         args.margin,
         args.gradient_clip_val,
         args.decay_rate_epochs,
+        args.batch_hard,
     )
 
 
@@ -295,6 +303,7 @@ def parse_args():
     parser.add_argument(
         "--weight_decay", type=float, default=0.0001, help="The L2 constant."
     )
+    parser.add_argument("--dropout", type=float, default=1.0, help="The dropout rate.")
     parser.add_argument(
         "--gradient_clip_val", type=int, default=2, help="The max grad norm."
     )
@@ -303,6 +312,12 @@ def parse_args():
         type=int,
         default=4,
         help="When to decay the learning rate.",
+    )
+    parser.add_argument(
+        "--batch_hard",
+        type=bool,
+        default=False,
+        help="Whether to train only on the hard negatives.",
     )
     return parser.parse_args()
 
