@@ -1,4 +1,4 @@
-attn_heads: 5
+attn_hops: 5
 attn_size: 64
 frob_norm_pen: 3.988117800466177
 gradient_clip_val: 7

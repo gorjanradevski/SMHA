@@ -69,7 +69,7 @@ def clip_value():
 
 
 @pytest.fixture
-def attn_heads():
+def attn_hops():
     return 5
 
 
@@ -140,12 +140,12 @@ def test_text_encoder(captions, captions_len, joint_space, num_layers, keep_prob
     assert outputs[2] == joint_space
 
 
-def test_joint_attention(attn_size, attn_heads, encoded_input):
+def test_joint_attention(attn_size, attn_hops, encoded_input):
     tf.reset_default_graph()
     encoded_input_shape = encoded_input.shape
     input_layer = tf.placeholder(dtype=tf.float32, shape=encoded_input_shape)
     attention = MultiHopAttentionModel.attention_graph(
-        attn_size, attn_heads, input_layer, "siamese_attention"
+        attn_size, attn_hops, input_layer, "siamese_attention"
     )
     with tf.Session() as sess:
         sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
@@ -153,9 +153,9 @@ def test_joint_attention(attn_size, attn_heads, encoded_input):
             attention, feed_dict={input_layer: encoded_input}
         )
         assert attended_input.shape[0] == 5
-        assert attended_input.shape[1] == attn_heads * encoded_input_shape[2]
+        assert attended_input.shape[1] == attn_hops * encoded_input_shape[2]
         assert alphas.shape[0] == encoded_input_shape[0]
-        assert alphas.shape[1] == attn_heads
+        assert alphas.shape[1] == attn_hops
         assert alphas.shape[2] == encoded_input_shape[1]
 
 
@@ -167,7 +167,7 @@ def test_attended_image_text_shape(
     joint_space,
     num_layers,
     attn_size,
-    attn_heads,
+    attn_hops,
     learning_rate,
     clip_value,
 ):
@@ -180,7 +180,7 @@ def test_attended_image_text_shape(
         joint_space,
         num_layers,
         attn_size,
-        attn_heads,
+        attn_hops,
     )
     assert model.attended_images.shape[0] == model.attended_captions.shape[0]
     assert model.attended_images.shape[1] == model.attended_captions.shape[1]

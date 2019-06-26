@@ -35,7 +35,7 @@ def train(
     decay_rate_epochs: int,
     learning_rate: float = None,
     frob_norm_pen: float = None,
-    attn_heads: int = None,
+    attn_hops: int = None,
     gor_pen: float = None,
     weight_decay: float = None,
     batch_hard: bool = False,
@@ -55,7 +55,7 @@ def train(
         log_model_path: Where to log the summaries.
         learning_rate: If provided update the one in hparams.
         frob_norm_pen: If provided update the one in hparams.
-        attn_heads: If provided update the one in hparams.
+        attn_hops: If provided update the one in hparams.
         gor_pen: If provided update the one in hparams.
         weight_decay: If provided update the one in hparams.
         decay_rate_epochs: When to decay the learning rate.
@@ -72,11 +72,11 @@ def train(
     # If frob_norm_pen is provided update the hparams frob_norm_pen
     if frob_norm_pen is not None:
         hparams.set_hparam("frob_norm_pen", frob_norm_pen)
-    # If attn_heads is provided update the hparams attn_heads
-    if attn_heads is not None:
-        hparams.set_hparam("attn_heads", attn_heads)
+    # If attn_hops is provided update the hparams attn_hops
+    if attn_hops is not None:
+        hparams.set_hparam("attn_hops", attn_hops)
     if gor_pen is not None:
-        hparams.set_hparam("gor_pen", attn_heads)
+        hparams.set_hparam("gor_pen", attn_hops)
     if weight_decay is not None:
         hparams.set_hparam("weight_decay", weight_decay)
     dataset = PascalSentencesDataset(images_path, texts_path)
@@ -87,7 +87,7 @@ def train(
 
     evaluator_train = Evaluator()
     evaluator_val = Evaluator(
-        len(val_image_paths), hparams.joint_space * hparams.attn_heads
+        len(val_image_paths), hparams.joint_space * hparams.attn_hops
     )
 
     logger.info("Evaluators created...")
@@ -116,7 +116,7 @@ def train(
         hparams.joint_space,
         hparams.num_layers,
         hparams.attn_size,
-        hparams.attn_heads,
+        hparams.attn_hops,
         hparams.learning_rate,
         hparams.gradient_clip_val,
         decay_steps,
@@ -226,7 +226,7 @@ def main():
         args.decay_rate_epochs,
         args.learning_rate,
         args.frob_norm_pen,
-        args.attn_heads,
+        args.attn_hops,
         args.gor_pen,
         args.weight_decay,
         args.batch_hard,
@@ -304,7 +304,7 @@ def parse_args():
         help="This will override the hparams frob norm penalization rate.",
     )
     parser.add_argument(
-        "--attn_heads",
+        "--attn_hops",
         type=int,
         default=None,
         help="This will override the hparams attention heads.",

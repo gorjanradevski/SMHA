@@ -17,7 +17,7 @@ class MultiHopAttentionModel:
         joint_space: int,
         num_layers: int,
         attn_size: int,
-        attn_heads: int,
+        attn_hops: int,
         learning_rate: float = 0.0,
         clip_value: int = 0,
         decay_steps: float = 0.0,
@@ -57,14 +57,14 @@ class MultiHopAttentionModel:
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.attention_graph(
-            attn_size, attn_heads, self.image_encoded, "image_attention"
+            attn_size, attn_hops, self.image_encoded, "image_attention"
         )
         # Reusing the same variables that were used for the images
         self.attended_captions, self.text_alphas = self.attention_graph(
-            attn_size, attn_heads, self.text_encoded, "text_attention"
+            attn_size, attn_hops, self.text_encoded, "text_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_heads, joint_space, batch_hard)
+        self.loss = self.compute_loss(margin, attn_hops, joint_space, batch_hard)
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
         )
@@ -166,7 +166,7 @@ class MultiHopAttentionModel:
 
     @staticmethod
     def attention_graph(
-        attn_size: int, attn_heads: int, encoded_input: tf.Tensor, scope: str
+        attn_size: int, attn_hops: int, encoded_input: tf.Tensor, scope: str
     ):
         """Applies attention on the encoded image and the encoded text.
 
@@ -177,7 +177,7 @@ class MultiHopAttentionModel:
 
         Args:
             attn_size: The size of the attention.
-            attn_heads: How many hops of attention to apply.
+            attn_hops: How many hops of attention to apply.
             encoded_input: The encoded input, can be both the image and the text.
             scope: The scope of the graph block.
 
@@ -202,7 +202,7 @@ class MultiHopAttentionModel:
             )
             u_omega = tf.get_variable(
                 name="u_omega",
-                shape=[attn_size, attn_heads],
+                shape=[attn_size, attn_hops],
                 initializer=tf.glorot_uniform_initializer(),
             )
 
@@ -214,7 +214,7 @@ class MultiHopAttentionModel:
             # [B * T, A_heads]
             vu = tf.matmul(v, u_omega)
             # [B, T, A_heads]
-            vu = tf.reshape(vu, [-1, time_steps, attn_heads])
+            vu = tf.reshape(vu, [-1, time_steps, attn_hops])
             # [B, A_heads, T]
             vu_transposed = tf.transpose(vu, [0, 2, 1])
             # [B, A_heads, T]
@@ -229,12 +229,12 @@ class MultiHopAttentionModel:
             return output, alphas
 
     @staticmethod
-    def compute_frob_norm(attention_weights: tf.Tensor, attn_heads: int) -> tf.Tensor:
+    def compute_frob_norm(attention_weights: tf.Tensor, attn_hops: int) -> tf.Tensor:
         """Computes the Frobenius norm of the attention weights tensor.
 
         Args:
             attention_weights: The attention weights.
-            attn_heads: The number of attention hops.
+            attn_hops: The number of attention hops.
 
         Returns:
             The Frobenius norm of the attention weights tensor.
@@ -244,8 +244,8 @@ class MultiHopAttentionModel:
             attention_weights, tf.transpose(attention_weights, [0, 2, 1])
         )
         identity_matrix = tf.reshape(
-            tf.tile(tf.eye(attn_heads), [tf.shape(attention_weights)[0], 1]),
-            [-1, attn_heads, attn_heads],
+            tf.tile(tf.eye(attn_hops), [tf.shape(attention_weights)[0], 1]),
+            [-1, attn_hops, attn_hops],
         )
 
         return tf.reduce_mean(
@@ -301,7 +301,7 @@ class MultiHopAttentionModel:
         return tf.pow(m1, 2) + tf.maximum(0.0, m2 - d)
 
     def compute_loss(
-        self, margin: float, attn_heads: int, joint_space: int, batch_hard: bool = False
+        self, margin: float, attn_hops: int, joint_space: int, batch_hard: bool = False
     ) -> tf.Tensor:
         """Computes the final loss of the model.
 
@@ -314,7 +314,7 @@ class MultiHopAttentionModel:
 
         Args:
             margin: The contrastive margin.
-            attn_heads: The number of attention heads.
+            attn_hops: The number of attention heads.
             joint_space: The space where the encoded images and text are going to be
             projected to.
             batch_hard: Whether to train only on the hard negatives.
@@ -330,15 +330,14 @@ class MultiHopAttentionModel:
             )
             triplet_loss = self.triplet_loss(scores, margin, batch_hard)
 
-            gor = self.gor(scores, attn_heads * joint_space) * self.gor_pen
+            gor = self.gor(scores, attn_hops * joint_space) * self.gor_pen
 
             pen_image_alphas = (
-                self.compute_frob_norm(self.image_alphas, attn_heads)
+                self.compute_frob_norm(self.image_alphas, attn_hops)
                 * self.frob_norm_pen
             )
             pen_text_alphas = (
-                self.compute_frob_norm(self.text_alphas, attn_heads)
-                * self.frob_norm_pen
+                self.compute_frob_norm(self.text_alphas, attn_hops) * self.frob_norm_pen
             )
 
             l2_loss = (

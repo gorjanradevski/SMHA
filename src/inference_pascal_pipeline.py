@@ -51,7 +51,7 @@ def inference(
     test_image_paths, test_captions = dataset.get_test_data()
     logger.info("Test dataset created...")
     evaluator_test = Evaluator(
-        len(test_image_paths), hparams.joint_space * hparams.attn_heads
+        len(test_image_paths), hparams.joint_space * hparams.attn_hops
     )
 
     logger.info("Test evaluator created...")
@@ -72,7 +72,7 @@ def inference(
         hparams.joint_space,
         hparams.num_layers,
         hparams.attn_size,
-        hparams.attn_heads,
+        hparams.attn_hops,
     )
     logger.info("Model created...")
     logger.info("Inference is starting...")
@@ -100,8 +100,14 @@ def inference(
 
         for recall_at in inference_for_recall_at:
             logger.info(
-                f"The recall at {recall_at} is: "
+                f"The image2text recall at {recall_at} is: "
                 f"{evaluator_test.image2text_recall_at_k(recall_at)}"
+            )
+
+        for recall_at in inference_for_recall_at:
+            logger.info(
+                f"The text2image recall at {recall_at} is: "
+                f"{evaluator_test.text2image_recall_at_k(recall_at)}"
             )
 
 
