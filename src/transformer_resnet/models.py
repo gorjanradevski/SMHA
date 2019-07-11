@@ -15,7 +15,7 @@ class TransformerResnet:
         margin: float,
         joint_space: int,
         learning_rate: float = 0.0,
-        clip_value: int = 0,
+        clip_value: float = 0.0,
         decay_steps: float = 0.0,
         batch_hard: bool = False,
         log_dir: str = "",
@@ -38,15 +38,13 @@ class TransformerResnet:
             )
         self.global_step = tf.Variable(0, trainable=False, name="global_step")
         # Create dropout and weight decay placeholder
-        self.gor_pen = tf.placeholder_with_default(0.0, None, name="gor_pen")
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
-        self.dropout = tf.placeholder_with_default(1.0, None, name="dropout")
         # Build model
         self.image_encoded = self.image_encoder_graph(self.images, joint_space)
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(self.captions, joint_space)
         logger.info("Text encoder graph created...")
-        self.loss = self.compute_loss(margin, joint_space, batch_hard)
+        self.loss = self.compute_loss(margin, batch_hard)
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
         )
@@ -75,8 +73,7 @@ class TransformerResnet:
             linear = tf.layers.dense(
                 embeddings,
                 joint_space,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                activation=tf.nn.relu,
+                kernel_initializer=tf.glorot_uniform_initializer(),
             )
 
             return linear
@@ -102,72 +99,20 @@ class TransformerResnet:
             linear = tf.layers.dense(
                 embeddings,
                 joint_space,
-                kernel_initializer=tf.variance_scaling_initializer(),
-                activation=tf.nn.relu,
+                kernel_initializer=tf.glorot_uniform_initializer(),
             )
 
             return linear
 
-    @staticmethod
-    def triplet_loss(scores: tf.Tensor, margin: float, batch_hard: bool = False):
-        diagonal = tf.diag_part(scores)
-        # Compare every diagonal score to scores in its column
-        # All contrastive images for each sentence
-        # noinspection PyTypeChecker
-        cost_s = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
-        # Compare every diagonal score to scores in its row
-        # All contrastive sentences for each image
-        # noinspection PyTypeChecker
-        cost_im = tf.maximum(0.0, margin - diagonal + scores)
-
-        # Clear diagonals
-        cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
-        cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
-
-        if batch_hard:
-            # For each positive pair (i,s) pick the hardest contrastive image
-            cost_s = tf.reduce_max(cost_s, axis=1)
-            # For each positive pair (i,s) pick the hardest contrastive sentence
-            cost_im = tf.reduce_max(cost_im, axis=0)
-
-        return tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
-
-    @staticmethod
-    def gor(scores: tf.Tensor, joint_space: int):
-        """Computes the global orthogonal regularization term as per:
-
-        https://arxiv.org/abs/1708.06320
-
-        Args:
-            scores: The per batch similarity scores.
-            joint_space: The size of the joint space.
-
-        Returns:
-            The global orthogonal regularization term.
-
-        """
-        scores_diag = tf.linalg.set_diag(scores, tf.zeros(tf.shape(scores)[0]))
-        non_zero = tf.cast(tf.count_nonzero(scores_diag), tf.float32)
-        m1 = tf.reduce_sum(scores_diag) / non_zero
-        m2 = tf.reduce_sum(tf.pow(scores_diag, 2)) / non_zero
-        d = 1 / joint_space
-
-        return tf.pow(m1, 2) + tf.maximum(0.0, m2 - d)
-
-    def compute_loss(
-        self, margin: float, joint_space: int, batch_hard: bool = False
-    ) -> tf.Tensor:
+    def compute_loss(self, margin: float, batch_hard: bool = False) -> tf.Tensor:
         """Computes the final loss of the model.
 
         1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612
-        2. Computes the GOR pen.
-        3. Computes the L2 loss.
-        4. Adds all together to compute the loss.
+        2. Computes the L2 loss.
+        3. Adds all together to compute the loss.
 
         Args:
             margin: The contrastive margin.
-            joint_space: The space where the encoded images and text are going to be
-            projected to.
             batch_hard: Whether to train only on the hard negatives.
 
         Returns:
@@ -176,9 +121,27 @@ class TransformerResnet:
         """
         with tf.variable_scope(name_or_scope="loss"):
             scores = tf.matmul(self.image_encoded, self.text_encoded, transpose_b=True)
-            triplet_loss = self.triplet_loss(scores, margin, batch_hard)
+            diagonal = tf.diag_part(scores)
+            # Compare every diagonal score to scores in its column
+            # All contrastive images for each sentence
+            # noinspection PyTypeChecker
+            cost_s = tf.maximum(0.0, margin - tf.reshape(diagonal, [-1, 1]) + scores)
+            # Compare every diagonal score to scores in its row
+            # All contrastive sentences for each image
+            # noinspection PyTypeChecker
+            cost_im = tf.maximum(0.0, margin - diagonal + scores)
 
-            gor = self.gor(scores, joint_space) * self.gor_pen
+            # Clear diagonals
+            cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
+            cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
+
+            if batch_hard:
+                # For each positive pair (i,s) pick the hardest contrastive image
+                cost_s = tf.reduce_max(cost_s, axis=1)
+                # For each positive pair (i,s) pick the hardest contrastive sentence
+                cost_im = tf.reduce_max(cost_im, axis=0)
+
+            matching_loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
             l2_loss = (
                 tf.add_n(
@@ -191,10 +154,14 @@ class TransformerResnet:
                 * self.weight_decay
             )
 
-            return triplet_loss + gor + l2_loss
+            return matching_loss + l2_loss
 
     def apply_gradients_op(
-        self, loss: tf.Tensor, learning_rate: float, clip_value: int, decay_steps: float
+        self,
+        loss: tf.Tensor,
+        learning_rate: float,
+        clip_value: float,
+        decay_steps: float,
     ) -> tf.Operation:
         """Applies the gradients on the variables.
 

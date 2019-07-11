@@ -33,9 +33,7 @@ def train(
     save_model_path: str,
     log_model_path: str,
     learning_rate: float,
-    gor_pen: float,
     weight_decay: float,
-    dropout: float,
     joint_space: int,
     margin: float,
     gradient_clip_val: int,
@@ -57,9 +55,7 @@ def train(
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         learning_rate: The learning rate.
-        gor_pen: The global orthogonal regularization rate.
         weight_decay: The L2 loss constant.
-        dropout: The dropout rate.
         joint_space: The space where the encoded images and text will be projected
         margin: The contrastive margin.
         gradient_clip_val: The max grad norm.
@@ -129,11 +125,7 @@ def train(
                     while True:
                         _, loss, lengths = sess.run(
                             [model.optimize, model.loss, model.captions],
-                            feed_dict={
-                                model.gor_pen: gor_pen,
-                                model.weight_decay: weight_decay,
-                                model.dropout: dropout,
-                            },
+                            feed_dict={model.weight_decay: weight_decay},
                         )
                         evaluator_train.update_metrics(loss)
                         pbar.update(len(lengths))
@@ -208,9 +200,7 @@ def main():
         args.save_model_path,
         args.log_model_path,
         args.learning_rate,
-        args.gor_pen,
         args.weight_decay,
-        args.dropout,
         args.joint_space,
         args.margin,
         args.gradient_clip_val,
@@ -285,10 +275,7 @@ def parse_args():
         "--prefetch_size", type=int, default=5, help="The size of prefetch on gpu."
     )
     parser.add_argument(
-        "--learning_rate",
-        type=float,
-        default=0.0002,
-        help="This will override the hparams learning rate.",
+        "--learning_rate", type=float, default=0.0002, help="The learning rate."
     )
     parser.add_argument(
         "--joint_space",
@@ -299,13 +286,11 @@ def parse_args():
     parser.add_argument(
         "--margin", type=float, default=0.2, help="The contrastive margin."
     )
-    parser.add_argument("--gor_pen", type=float, default=0.0, help="The GOR rate.")
     parser.add_argument(
         "--weight_decay", type=float, default=0.0001, help="The L2 constant."
     )
-    parser.add_argument("--dropout", type=float, default=1.0, help="The dropout rate.")
     parser.add_argument(
-        "--gradient_clip_val", type=int, default=2, help="The max grad norm."
+        "--gradient_clip_val", type=float, default=2.0, help="The clipping threshold."
     )
     parser.add_argument(
         "--decay_rate_epochs",
