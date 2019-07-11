@@ -57,11 +57,11 @@ class MultiHopAttentionModel:
         )
         logger.info("Text encoder graph created...")
         self.attended_images, self.image_alphas = self.attention_graph(
-            attn_size, attn_hops, self.image_encoded, "image_attention"
+            attn_size, attn_hops, self.image_encoded, "siamese_attention"
         )
         # Reusing the same variables that were used for the images
         self.attended_captions, self.text_alphas = self.attention_graph(
-            attn_size, attn_hops, self.text_encoded, "text_attention"
+            attn_size, attn_hops, self.text_encoded, "siamese_attention"
         )
         logger.info("Attention graph created...")
         self.loss = self.compute_loss(margin, attn_hops, joint_space, batch_hard)

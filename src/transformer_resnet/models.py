@@ -42,13 +42,9 @@ class TransformerResnet:
         self.weight_decay = tf.placeholder_with_default(0.0, None, name="weight_decay")
         self.dropout = tf.placeholder_with_default(1.0, None, name="dropout")
         # Build model
-        self.image_encoded = self.image_encoder_graph(
-            self.images, joint_space, self.dropout
-        )
+        self.image_encoded = self.image_encoder_graph(self.images, joint_space)
         logger.info("Image encoder graph created...")
-        self.text_encoded = self.text_encoder_graph(
-            self.captions, joint_space, self.dropout
-        )
+        self.text_encoded = self.text_encoder_graph(self.captions, joint_space)
         logger.info("Text encoder graph created...")
         self.loss = self.compute_loss(margin, joint_space, batch_hard)
         self.optimize = self.apply_gradients_op(
@@ -58,9 +54,7 @@ class TransformerResnet:
         logger.info("Graph creation finished...")
 
     @staticmethod
-    def image_encoder_graph(
-        images: tf.Tensor, joint_space: int, dropout: float
-    ) -> tf.Tensor:
+    def image_encoder_graph(images: tf.Tensor, joint_space: int) -> tf.Tensor:
         """Extract higher level features from the image using a resnet152 pretrained on
         ImageNet.
 
@@ -68,7 +62,6 @@ class TransformerResnet:
             images: The input images.
             joint_space: The space where the encoded images and text are going to be
             projected to.
-            dropout: The dropout rate.
 
         Returns:
             The encoded image.
@@ -79,28 +72,23 @@ class TransformerResnet:
                 "https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/3"
             )
             embeddings = resnet(images)
-            linear1 = tf.layers.dense(
+            linear = tf.layers.dense(
                 embeddings,
                 joint_space,
                 kernel_initializer=tf.variance_scaling_initializer(),
                 activation=tf.nn.relu,
             )
-            dropout = tf.layers.dropout(linear1, rate=dropout)
-            linear2 = tf.layers.dense(
-                dropout, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
-            )
 
-            return linear2
+            return linear
 
     @staticmethod
-    def text_encoder_graph(captions: tf.Tensor, joint_space: int, dropout: float):
+    def text_encoder_graph(captions: tf.Tensor, joint_space: int):
         """Encodes the text it gets as input using a bidirectional rnn.
 
         Args:
             captions: The inputs.
             joint_space: The space where the encoded images and text are going to be
             projected to.
-            dropout: The dropout rate.
 
         Returns:
             The encoded text.
@@ -111,18 +99,14 @@ class TransformerResnet:
                 "https://tfhub.dev/google/universal-sentence-encoder-large/3"
             )
             embeddings = transformer(captions)
-            linear1 = tf.layers.dense(
+            linear = tf.layers.dense(
                 embeddings,
                 joint_space,
                 kernel_initializer=tf.variance_scaling_initializer(),
                 activation=tf.nn.relu,
             )
-            dropout = tf.layers.dropout(linear1, rate=dropout)
-            linear2 = tf.layers.dense(
-                dropout, joint_space, kernel_initializer=tf.glorot_uniform_initializer()
-            )
 
-            return linear2
+            return linear
 
     @staticmethod
     def triplet_loss(scores: tf.Tensor, margin: float, batch_hard: bool = False):
