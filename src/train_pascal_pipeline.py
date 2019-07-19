@@ -80,9 +80,7 @@ def train(
     logger.info("Validation dataset created...")
 
     evaluator_train = Evaluator()
-    evaluator_val = Evaluator(
-        len(val_image_paths), hparams.joint_space * hparams.attn_hops
-    )
+    evaluator_val = Evaluator(len(val_image_paths), hparams.joint_space)
 
     logger.info("Evaluators created...")
 

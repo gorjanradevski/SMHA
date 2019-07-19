@@ -50,9 +50,7 @@ def inference(
     # Getting the vocabulary size of the train dataset
     test_image_paths, test_captions = dataset.get_test_data()
     logger.info("Test dataset created...")
-    evaluator_test = Evaluator(
-        len(test_image_paths), hparams.joint_space * hparams.attn_hops
-    )
+    evaluator_test = Evaluator(len(test_image_paths), hparams.joint_space)
 
     logger.info("Test evaluator created...")
 
