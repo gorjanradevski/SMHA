@@ -136,11 +136,8 @@ class TransformerResnet:
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
             batch_size = tf.shape(scores)[0]
-            with tf.control_dependencies(
-                [tf.debugging.assert_greater_equal(batch_size, k)]
-            ):
-                # Convert k% to integer
-                k = tf.cast(k * batch_size // 100, tf.int32)
+            # Convert k% to integer
+            k = tf.cast(k * batch_size // 100, tf.int32)
             # Convert k% to integer
             k = tf.cast(k * batch_size // 100, tf.int32)
             # For each positive pair (i,s) pick the hardest contrastive image
