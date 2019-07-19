@@ -222,8 +222,8 @@ class MultiHopAttentionModel:
             alphas = tf.nn.softmax(vu_transposed, name="alphas", axis=2)
             # [B, A_hops, H]
             output = tf.matmul(alphas, encoded_input)
-            # [B, H]
-            output = tf.reduce_mean(output, axis=1)
+            # [B, A_hops * H]
+            output = tf.layers.flatten(output)
             # [B, H] normalized output
             output = tf.math.l2_normalize(output, axis=1)
 

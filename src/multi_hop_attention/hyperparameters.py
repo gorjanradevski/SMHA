@@ -200,7 +200,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         dataset = FlickrDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_data(self.train_imgs_file_path)
         val_image_paths, val_captions = dataset.get_data(self.val_imgs_file_path)
-        evaluator_val = Evaluator(len(val_image_paths), joint_space)
+        evaluator_val = Evaluator(len(val_image_paths), attn_hops * joint_space)
 
         # Resetting the default graph and setting the random seed
         tf.reset_default_graph()
@@ -332,7 +332,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
         train_image_paths, train_captions = dataset.get_train_data()
         # Getting the vocabulary size of the train dataset
         val_image_paths, val_captions = dataset.get_val_data()
-        evaluator_val = Evaluator(len(val_image_paths), joint_space)
+        evaluator_val = Evaluator(len(val_image_paths), attn_hops * joint_space)
 
         # Resetting the default graph and setting the random seed
         tf.reset_default_graph()
