@@ -33,12 +33,10 @@ def train(
     save_model_path: str,
     log_model_path: str,
     decay_rate_epochs: int,
+    k: int = None,
     learning_rate: float = None,
     frob_norm_pen: float = None,
     attn_hops: int = None,
-    gor_pen: float = None,
-    weight_decay: float = None,
-    batch_hard: bool = False,
 ) -> None:
     """Starts a training session with the Pascal1k sentences dataset.
 
@@ -56,10 +54,8 @@ def train(
         learning_rate: If provided update the one in hparams.
         frob_norm_pen: If provided update the one in hparams.
         attn_hops: If provided update the one in hparams.
-        gor_pen: If provided update the one in hparams.
-        weight_decay: If provided update the one in hparams.
+        k: If provided update the one in hparams.
         decay_rate_epochs: When to decay the learning rate.
-        batch_hard: Whether to train only on the hard negatives.
 
     Returns:
         None
@@ -75,10 +71,8 @@ def train(
     # If attn_hops is provided update the hparams attn_hops
     if attn_hops is not None:
         hparams.set_hparam("attn_hops", attn_hops)
-    if gor_pen is not None:
-        hparams.set_hparam("gor_pen", attn_hops)
-    if weight_decay is not None:
-        hparams.set_hparam("weight_decay", weight_decay)
+    if k is not None:
+        hparams.set_hparam("k", k)
     dataset = PascalSentencesDataset(images_path, texts_path)
     train_image_paths, train_captions = dataset.get_train_data()
     val_image_paths, val_captions = dataset.get_val_data()
@@ -117,10 +111,10 @@ def train(
         hparams.num_layers,
         hparams.attn_size,
         hparams.attn_hops,
+        hparams.k,
         hparams.learning_rate,
         hparams.gradient_clip_val,
         decay_steps,
-        batch_hard,
         log_model_path,
         hparams.name,
     )
@@ -147,7 +141,6 @@ def train(
                             [model.optimize, model.loss, model.captions_len],
                             feed_dict={
                                 model.frob_norm_pen: hparams.frob_norm_pen,
-                                model.gor_pen: hparams.gor_pen,
                                 model.keep_prob: hparams.keep_prob,
                                 model.weight_decay: hparams.weight_decay,
                             },
@@ -188,6 +181,11 @@ def train(
                 )
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
+            else:
+                logger.info(
+                    f"On epoch {e + 1} the recall at {recall_at} is: "
+                    f"{evaluator_val.cur_image2text_recall_at_k} :("
+                )
 
             # Write multi_hop_attention summaries
             train_loss_summary = sess.run(
@@ -224,12 +222,10 @@ def main():
         args.save_model_path,
         args.log_model_path,
         args.decay_rate_epochs,
+        args.k,
         args.learning_rate,
         args.frob_norm_pen,
         args.attn_hops,
-        args.gor_pen,
-        args.weight_decay,
-        args.batch_hard,
     )
 
 
@@ -310,28 +306,13 @@ def parse_args():
         help="This will override the hparams attention heads.",
     )
     parser.add_argument(
-        "--gor_pen",
-        type=float,
-        default=None,
-        help="This will override the hparams gor penalization rate.",
-    )
-    parser.add_argument(
-        "--weight_decay",
-        type=float,
-        default=None,
-        help="This will override the hparams weight_decay penalization rate.",
-    )
-    parser.add_argument(
         "--decay_rate_epochs",
         type=int,
         default=4,
         help="When to decay the learning rate.",
     )
     parser.add_argument(
-        "--batch_hard",
-        type=bool,
-        default=False,
-        help="Whether to train only on the hard negatives.",
+        "--k", type=int, default=100, help="The k% of hardest negatives to train on."
     )
     return parser.parse_args()
 

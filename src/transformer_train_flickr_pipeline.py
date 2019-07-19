@@ -38,7 +38,7 @@ def train(
     margin: float,
     gradient_clip_val: int,
     decay_rate_epochs: int,
-    batch_hard: bool,
+    k: int,
 ) -> None:
     """Starts a training session with the Flickr8k dataset.
 
@@ -60,7 +60,6 @@ def train(
         margin: The contrastive margin.
         gradient_clip_val: The max grad norm.
         decay_rate_epochs: When to decay the learning rate.
-        batch_hard: Whether to train only on the hard negatives.
 
     Returns:
         None
@@ -100,7 +99,7 @@ def train(
         learning_rate,
         gradient_clip_val,
         decay_steps,
-        batch_hard,
+        k,
         log_model_path,
         "TRANS",
     )
@@ -163,6 +162,11 @@ def train(
                 )
                 logger.info("=============================")
                 model.save_model(sess, save_model_path)
+            else:
+                logger.info(
+                    f"On epoch {e + 1} the recall at {recall_at} is: "
+                    f"{evaluator_val.cur_image2text_recall_at_k} :("
+                )
 
             # Write multi_hop_attention summaries
             train_loss_summary = sess.run(
@@ -205,7 +209,7 @@ def main():
         args.margin,
         args.gradient_clip_val,
         args.decay_rate_epochs,
-        args.batch_hard,
+        args.k,
     )
 
 
@@ -299,10 +303,7 @@ def parse_args():
         help="When to decay the learning rate.",
     )
     parser.add_argument(
-        "--batch_hard",
-        type=bool,
-        default=False,
-        help="Whether to train only on the hard negatives.",
+        "--k", type=bool, default=100, help="The k% of hard negatives to train on."
     )
     return parser.parse_args()
 

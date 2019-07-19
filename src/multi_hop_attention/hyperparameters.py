@@ -81,11 +81,11 @@ class BaseHparamsFinder(ABC):
             "attn_hops": hp.choice("attn_hops", [5, 10, 20, 30]),
             "frob_norm_pen": hp.loguniform("frob_norm_pen", np.log(0.5), np.log(3.0)),
             "gradient_clip_val": hp.choice("gradient_clip_val", [1, 3, 5, 7]),
-            "gor_pen": hp.loguniform("gor_pen", np.log(0.5), np.log(3.0)),
             "keep_prob": hp.choice("keep_prob", [0.7, 0.8, 0.9, 1.0]),
             "weight_decay": hp.loguniform(
                 "weight_decay", np.log(0.00001), np.log(0.01)
             ),
+            "k": hp.choice("k", range(10, 101, 10)),
         }
 
     @abstractmethod
@@ -193,9 +193,9 @@ class FlickrHparamsFinder(BaseHparamsFinder):
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         margin = args["margin"]
-        gor_pen = args["gor_pen"]
         keep_prob = args["keep_prob"]
         weight_decay = args["weight_decay"]
+        k = args["k"]
 
         dataset = FlickrDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_data(self.train_imgs_file_path)
@@ -226,6 +226,7 @@ class FlickrHparamsFinder(BaseHparamsFinder):
             num_layers,
             attn_size,
             attn_hops,
+            k,
             learning_rate,
             gradient_clip_val,
             decay_steps,
@@ -246,7 +247,6 @@ class FlickrHparamsFinder(BaseHparamsFinder):
                             [model.optimize, model.loss],
                             feed_dict={
                                 model.frob_norm_pen: frob_norm_pen,
-                                model.gor_pen: gor_pen,
                                 model.keep_prob: keep_prob,
                                 model.weight_decay: weight_decay,
                             },
@@ -324,9 +324,9 @@ class PascalHparamsFinder(BaseHparamsFinder):
         learning_rate = args["learning_rate"]
         gradient_clip_val = args["gradient_clip_val"]
         margin = args["margin"]
-        gor_pen = args["gor_pen"]
         keep_prob = args["keep_prob"]
         weight_decay = args["weight_decay"]
+        k = args["k"]
 
         dataset = PascalSentencesDataset(self.images_path, self.texts_path)
         train_image_paths, train_captions = dataset.get_train_data()
@@ -358,6 +358,7 @@ class PascalHparamsFinder(BaseHparamsFinder):
             num_layers,
             attn_size,
             attn_hops,
+            k,
             learning_rate,
             gradient_clip_val,
             decay_steps,
@@ -377,7 +378,6 @@ class PascalHparamsFinder(BaseHparamsFinder):
                             [model.optimize, model.loss],
                             feed_dict={
                                 model.frob_norm_pen: frob_norm_pen,
-                                model.gor_pen: gor_pen,
                                 model.keep_prob: keep_prob,
                                 model.weight_decay: weight_decay,
                             },

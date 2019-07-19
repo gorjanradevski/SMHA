@@ -5,9 +5,9 @@ gradient_clip_val: 7
 learning_rate: 0.0011833723795770603
 margin: 0.2
 joint_space: 512
-gor_pen: 0.5
 name: DEFLT
 seed: 353888
 keep_prob: 0.8
 num_layers: 1
 weight_decay: 0.01
+k: 100
