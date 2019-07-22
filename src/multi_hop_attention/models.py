@@ -196,24 +196,21 @@ class MultiHopAttentionModel:
                 shape=[hidden_size, attn_size],
                 initializer=tf.glorot_uniform_initializer(),
             )
-            bw_omega = tf.get_variable(
-                name="bw_omega", shape=[attn_size], initializer=tf.zeros_initializer()
+            b_omega = tf.get_variable(
+                name="b_omega", shape=[attn_size], initializer=tf.zeros_initializer()
             )
             u_omega = tf.get_variable(
                 name="u_omega",
                 shape=[attn_size, attn_hops],
                 initializer=tf.glorot_uniform_initializer(),
             )
-            bu_omega = tf.get_variable(
-                name="bu_omega", shape=[attn_hops], initializer=tf.zeros_initializer()
-            )
             # Apply attention
             # [B * T, H]
             encoded_input_reshaped = tf.reshape(encoded_input, [-1, hidden_size])
             # [B * T, A_size]
-            v = tf.tanh(tf.matmul(encoded_input_reshaped, w_omega) + bw_omega)
+            v = tf.tanh(tf.matmul(encoded_input_reshaped, w_omega) + b_omega)
             # [B * T, A_heads]
-            vu = tf.matmul(v, u_omega) + bu_omega
+            vu = tf.matmul(v, u_omega)
             # [B, T, A_hops]
             vu = tf.reshape(vu, [-1, time_steps, attn_hops])
             # [B, A_hops, T]
@@ -270,6 +267,8 @@ class MultiHopAttentionModel:
         # Clear diagonals
         cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
         cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
+
+        logger.info(f"Will train on the {k}% hardest within a batch...")
 
         batch_size = tf.shape(scores)[0]
         # Convert k% to integer
