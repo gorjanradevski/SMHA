@@ -29,11 +29,10 @@ def train(
     recall_at: int,
     batch_size: int,
     prefetch_size: int,
-    checkpoint_path: str,
     save_model_path: str,
     log_model_path: str,
     decay_rate_epochs: int,
-    k: int = None,
+    batch_hard: bool,
     learning_rate: float = None,
     frob_norm_pen: float = None,
     attn_hops: int = None,
@@ -48,13 +47,12 @@ def train(
         recall_at: Validate on recall at K.
         batch_size: The batch size to be used.
         prefetch_size: How many batches to keep on GPU ready for processing.
-        checkpoint_path: Path to a valid model checkpoint.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         learning_rate: If provided update the one in hparams.
         frob_norm_pen: If provided update the one in hparams.
         attn_hops: If provided update the one in hparams.
-        k: If provided update the one in hparams.
+        batch_hard: Whether to train only on the hardest negatives.
         decay_rate_epochs: When to decay the learning rate.
 
     Returns:
@@ -71,8 +69,6 @@ def train(
     # If attn_hops is provided update the hparams attn_hops
     if attn_hops is not None:
         hparams.set_hparam("attn_hops", attn_hops)
-    if k is not None:
-        hparams.set_hparam("k", k)
     dataset = PascalSentencesDataset(images_path, texts_path)
     train_image_paths, train_captions = dataset.get_train_data()
     val_image_paths, val_captions = dataset.get_val_data()
@@ -111,10 +107,10 @@ def train(
         hparams.num_layers,
         hparams.attn_size,
         hparams.attn_hops,
-        hparams.k,
         hparams.learning_rate,
         hparams.gradient_clip_val,
         decay_steps,
+        batch_hard,
         log_model_path,
         hparams.name,
     )
@@ -124,7 +120,7 @@ def train(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path)
+        model.init(sess)
         model.add_summary_graph(sess)
 
         for e in range(epochs):
@@ -218,11 +214,10 @@ def main():
         args.recall_at,
         args.batch_size,
         args.prefetch_size,
-        args.checkpoint_path,
         args.save_model_path,
         args.log_model_path,
         args.decay_rate_epochs,
-        args.k,
+        args.batch_hard,
         args.learning_rate,
         args.frob_norm_pen,
         args.attn_hops,
@@ -311,9 +306,8 @@ def parse_args():
         default=4,
         help="When to decay the learning rate.",
     )
-    parser.add_argument(
-        "--k", type=int, default=100, help="The k% of hardest negatives to train on."
-    )
+    parser.add_argument("--batch_hard", action="store_true")
+
     return parser.parse_args()
 
 

@@ -2,6 +2,7 @@ import tensorflow as tf
 import logging
 from typing import Tuple
 import tensorflow_hub as hub
+import sys
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,10 +19,10 @@ class MultiHopAttentionModel:
         num_layers: int,
         attn_size: int,
         attn_hops: int,
-        k: int = 100,
         learning_rate: float = 0.0,
         clip_value: int = 0,
-        decay_steps: float = 0.0,
+        decay_steps: float = sys.maxsize,
+        batch_hard: bool = False,
         log_dir: str = "",
         name: str = "",
     ):
@@ -63,7 +64,7 @@ class MultiHopAttentionModel:
             attn_size, attn_hops, self.text_encoded, "siamese_attention"
         )
         logger.info("Attention graph created...")
-        self.loss = self.compute_loss(margin, attn_hops, k)
+        self.loss = self.compute_loss(margin, attn_hops, batch_hard)
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
         )
@@ -221,7 +222,7 @@ class MultiHopAttentionModel:
             output = tf.matmul(alphas, encoded_input)
             # [B, A_hops * H]
             output = tf.layers.flatten(output)
-            # [B, H] normalized output
+            # [B, A_hops * H] normalized output
             output = tf.math.l2_normalize(output, axis=1)
 
             return output, alphas
@@ -253,7 +254,7 @@ class MultiHopAttentionModel:
         )
 
     @staticmethod
-    def triplet_loss(scores: tf.Tensor, margin: float, k: int):
+    def triplet_loss(scores: tf.Tensor, margin: float, batch_hard: bool):
         diagonal = tf.diag_part(scores)
         # Compare every diagonal score to scores in its column
         # All contrastive images for each sentence
@@ -268,22 +269,22 @@ class MultiHopAttentionModel:
         cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
         cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-        logger.info(f"Will train on the {k}% hardest within a batch...")
-
-        batch_size = tf.shape(scores)[0]
-        # Convert k% to integer
-        k = tf.cast(k * batch_size // 100, tf.int32)
-        # For each positive pair (i,s) pick the hardest contrastive image
-        cost_s, _ = tf.math.top_k(cost_s, k=k)
-        # For each positive pair (i,s) pick the hardest contrastive sentence
-        cost_im, _ = tf.math.top_k(tf.transpose(cost_im), k=k)
+        if batch_hard:
+            logger.info("Training only on the hardest negatives...")
+            # For each positive pair (i,s) pick the hardest contrastive image
+            cost_s = tf.reduce_max(cost_s, axis=1)
+            # For each positive pair (i,s) pick the hardest contrastive sentence
+            cost_im = tf.reduce_max(cost_im, axis=0)
 
         return tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
-    def compute_loss(self, margin: float, attn_hops: int, k: int) -> tf.Tensor:
+    def compute_loss(
+        self, margin: float, attn_hops: int, batch_hard: bool
+    ) -> tf.Tensor:
         """Computes the final loss of the model.
 
-        1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612 (Batch hard K)
+        1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612 (Batch hard or
+        batch all)
         2. Computes the Frob norm of the of the AA^T - I (image embeddings).
         3. Computes the Frob norm of the of the AA^T - I (text embeddings).
         4. Computes the L2 loss.
@@ -292,7 +293,7 @@ class MultiHopAttentionModel:
         Args:
             margin: The contrastive margin.
             attn_hops: The number of attention heads.
-            k: The k% hardest negatives to train on.
+            batch_hard: Whether to train on the hard negatives.
 
 
         Returns:
@@ -303,7 +304,7 @@ class MultiHopAttentionModel:
             scores = tf.matmul(
                 self.attended_images, self.attended_captions, transpose_b=True
             )
-            triplet_loss = self.triplet_loss(scores, margin, k)
+            triplet_loss = self.triplet_loss(scores, margin, batch_hard)
 
             pen_image_alphas = (
                 self.compute_frob_norm(self.image_alphas, attn_hops)
@@ -347,7 +348,7 @@ class MultiHopAttentionModel:
                 self.global_step,
                 decay_steps,
                 0.5,
-                staircase=False,
+                staircase=True,
                 name="lr_decay",
             )
             optimizer = tf.train.AdamOptimizer(learning_rate)

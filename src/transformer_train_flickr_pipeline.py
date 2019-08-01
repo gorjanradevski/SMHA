@@ -29,7 +29,6 @@ def train(
     recall_at: int,
     batch_size: int,
     prefetch_size: int,
-    checkpoint_path: str,
     save_model_path: str,
     log_model_path: str,
     learning_rate: float,
@@ -38,7 +37,6 @@ def train(
     margin: float,
     gradient_clip_val: int,
     decay_rate_epochs: int,
-    k: int,
 ) -> None:
     """Starts a training session with the Flickr8k dataset.
 
@@ -51,7 +49,6 @@ def train(
         recall_at: Validate on recall at K.
         batch_size: The batch size to be used.
         prefetch_size: How many batches to keep on GPU ready for processing.
-        checkpoint_path: Path to a valid model checkpoint.
         save_model_path: Where to save the model.
         log_model_path: Where to log the summaries.
         learning_rate: The learning rate.
@@ -76,7 +73,7 @@ def train(
 
     logger.info("Evaluators created...")
 
-    # Resetting the default graph and setting the random seed
+    # Resetting the default graph
     tf.reset_default_graph()
 
     loader = TrainValLoader(
@@ -99,7 +96,6 @@ def train(
         learning_rate,
         gradient_clip_val,
         decay_steps,
-        k,
         log_model_path,
         "TRANS",
     )
@@ -109,7 +105,7 @@ def train(
     with tf.Session() as sess:
 
         # Initializers
-        model.init(sess, checkpoint_path)
+        model.init(sess)
         model.add_summary_graph(sess)
 
         for e in range(epochs):
@@ -200,7 +196,6 @@ def main():
         args.recall_at,
         args.batch_size,
         args.prefetch_size,
-        args.checkpoint_path,
         args.save_model_path,
         args.log_model_path,
         args.learning_rate,
@@ -209,7 +204,6 @@ def main():
         args.margin,
         args.gradient_clip_val,
         args.decay_rate_epochs,
-        args.k,
     )
 
 
@@ -247,9 +241,6 @@ def parse_args():
         type=str,
         default="data/Flickr8k_dataset/Flickr8k_text/Flickr_8k.devImages.txt",
         help="Path to the file where the validation images names are included.",
-    )
-    parser.add_argument(
-        "--checkpoint_path", type=str, default=None, help="Path to a model checkpoint."
     )
     parser.add_argument(
         "--log_model_path",
@@ -301,9 +292,6 @@ def parse_args():
         type=int,
         default=4,
         help="When to decay the learning rate.",
-    )
-    parser.add_argument(
-        "--k", type=bool, default=100, help="The k% of hard negatives to train on."
     )
     return parser.parse_args()
 

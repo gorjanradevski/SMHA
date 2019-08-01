@@ -13,7 +13,6 @@ def optimize(
     batch_size: int,
     prefetch_size: int,
     epochs: int,
-    decay_rate_epochs: int,
     recall_at: int,
     num_iters: int,
     hparams_path: str,
@@ -28,7 +27,6 @@ def optimize(
         batch_size: The batch size that will be used to conduct the experiments.
         prefetch_size: The prefetching size when running on GPU.
         epochs: The number of epochs per experiment.
-        decay_rate_epochs: When to decay the learning rate.
         recall_at: Validate on recall at K.
         num_iters: How many times to do random sampling.
         hparams_path: Where to dump the hparams.
@@ -39,13 +37,7 @@ def optimize(
 
     """
     hparams_finder = PascalHparamsFinder(
-        images_path,
-        texts_path,
-        batch_size,
-        prefetch_size,
-        epochs,
-        decay_rate_epochs,
-        recall_at,
+        images_path, texts_path, batch_size, prefetch_size, epochs, recall_at
     )
     hparams_finder.find_best(num_iters, hparams_path, trials_path)
 
@@ -60,7 +52,6 @@ def main():
         args.batch_size,
         args.prefetch_size,
         args.epochs,
-        args.decay_rate_epochs,
         args.recall_at,
         args.num_iters,
         args.hparams_path,
@@ -124,12 +115,6 @@ def parse_args():
         type=str,
         default="trials/experiment.pkl",
         help="From where to read or where to dump the trials object.",
-    )
-    parser.add_argument(
-        "--decay_rate_epochs",
-        type=int,
-        default=4,
-        help="When to decay the learning rate.",
     )
     return parser.parse_args()
 

@@ -17,7 +17,6 @@ class TransformerResnet:
         learning_rate: float = 0.0,
         clip_value: float = 0.0,
         decay_steps: float = 0.0,
-        k: int = 100,
         log_dir: str = "",
         name: str = "",
     ):
@@ -44,7 +43,7 @@ class TransformerResnet:
         logger.info("Image encoder graph created...")
         self.text_encoded = self.text_encoder_graph(self.captions, joint_space)
         logger.info("Text encoder graph created...")
-        self.loss = self.compute_loss(margin, k)
+        self.loss = self.compute_loss(margin)
         self.optimize = self.apply_gradients_op(
             self.loss, learning_rate, clip_value, decay_steps
         )
@@ -104,7 +103,7 @@ class TransformerResnet:
 
             return tf.math.l2_normalize(linear, axis=1)
 
-    def compute_loss(self, margin: float, k: int) -> tf.Tensor:
+    def compute_loss(self, margin: float) -> tf.Tensor:
         """Computes the final loss of the model.
 
         1. Computes the Triplet loss: https://arxiv.org/abs/1707.05612
@@ -113,7 +112,6 @@ class TransformerResnet:
 
         Args:
             margin: The contrastive margin.
-            k: The k% of hard negatives to train on.
 
         Returns:
             The final loss to be optimized.
@@ -135,15 +133,10 @@ class TransformerResnet:
             cost_s = tf.linalg.set_diag(cost_s, tf.zeros(tf.shape(cost_s)[0]))
             cost_im = tf.linalg.set_diag(cost_im, tf.zeros(tf.shape(cost_im)[0]))
 
-            batch_size = tf.shape(scores)[0]
-            # Convert k% to integer
-            k = tf.cast(k * batch_size // 100, tf.int32)
-            # Convert k% to integer
-            k = tf.cast(k * batch_size // 100, tf.int32)
             # For each positive pair (i,s) pick the hardest contrastive image
-            cost_s, _ = tf.math.top_k(cost_s, k=k)
+            cost_s = tf.reduce_max(cost_s, axis=1)
             # For each positive pair (i,s) pick the hardest contrastive sentence
-            cost_im, _ = tf.math.top_k(tf.transpose(cost_im), k=k)
+            cost_im = tf.reduce_max(cost_im, axis=0)
 
             matching_loss = tf.reduce_sum(cost_s) + tf.reduce_sum(cost_im)
 
